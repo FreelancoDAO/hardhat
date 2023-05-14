@@ -1,19 +1,20 @@
-import "@typechain/hardhat"
-import "@nomiclabs/hardhat-waffle"
-import "@nomiclabs/hardhat-etherscan"
-import "@nomiclabs/hardhat-ethers"
-import "hardhat-gas-reporter"
-import "dotenv/config"
-import "solidity-coverage"
-import "solidity-docgen"
-import "hardhat-deploy"
-import { HardhatUserConfig } from "hardhat/config"
+import "@typechain/hardhat";
+import "@nomiclabs/hardhat-waffle";
+import "@nomiclabs/hardhat-etherscan";
+import "@nomiclabs/hardhat-ethers";
+import "hardhat-gas-reporter";
+import "dotenv/config";
+import "solidity-coverage";
+import "solidity-docgen";
+import "hardhat-deploy";
+import { HardhatUserConfig } from "hardhat/config";
 
 // const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || ""
 // const SEPOLIA_RPC_URL =
 //   process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR-API-KEY"
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "privatKey"
-const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "VHIK1926T58YMZS4MS1DVCRYJF8D7T1TRQ"
+const PRIVATE_KEY = process.env.PRIVATE_KEY || "privatKey";
+const ETHERSCAN_API_KEY =
+  process.env.ETHERSCAN_API_KEY || "VHIK1926T58YMZS4MS1DVCRYJF8D7T1TRQ";
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -40,7 +41,20 @@ const config: HardhatUserConfig = {
     // },
   },
   solidity: {
-    version: "0.8.9",
+    compilers: [
+      {
+        version: "0.8.9",
+      },
+      {
+        version: "0.4.24",
+      },
+      {
+        version: "0.7.0",
+      },
+      {
+        version: "0.8.0",
+      },
+    ],
     settings: {
       optimizer: {
         enabled: true,
@@ -67,6 +81,6 @@ const config: HardhatUserConfig = {
   mocha: {
     timeout: 200000, // 200 seconds max for running tests
   },
-}
+};
 
-export default config
+export default config;
