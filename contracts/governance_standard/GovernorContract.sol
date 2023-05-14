@@ -52,7 +52,7 @@ contract GovernorContract is
     mapping(uint256 => VoterDetails[]) public voters;
     mapping(uint256 => uint256) public _counterToProposalId;
     mapping(bytes32 => uint256) public requestIdToProposalId;
-    mapping(uint256 => uint256) public proposalIdToChatGPT;
+    mapping(uint256 => uint8) public proposalIdToChatGPT;
     uint256 public immutable amountToMintPerProposal = 100 ether;
 
     constructor(
@@ -92,11 +92,7 @@ contract GovernorContract is
         uint64 subscriptionId,
         uint32 gasLimit,
         uint256 proposalId
-    ) public onlyOwner returns (bytes32) {
-        if (state(proposalId) != ProposalState.Queued) {
-            revert ProposalNeedsToBeQueued();
-        }
-
+    ) public returns (bytes32) {
         Functions.Request memory req;
         req.initializeRequest(
             Functions.Location.Inline,
@@ -109,6 +105,7 @@ contract GovernorContract is
         if (args.length > 0) req.addArgs(args);
 
         bytes32 assignedReqID = sendRequest(req, subscriptionId, gasLimit);
+
         latestRequestId = assignedReqID;
         requestIdToProposalId[latestRequestId] = proposalId;
         return assignedReqID;
@@ -122,9 +119,23 @@ contract GovernorContract is
         latestResponse = response;
         latestError = err;
         uint256 _proposalId = requestIdToProposalId[latestRequestId];
-        proposalIdToChatGPT[_proposalId] = abi.decode(response, (uint256));
+        proposalIdToChatGPT[_proposalId] = abi.decode(response, (uint8));
 
         console.log("Chat GPT voted", proposalIdToChatGPT[_proposalId]);
+
+        console.log(proposalIdToChatGPT[_proposalId]);
+
+        address gpt_address = 0x15c7Bc1F4E486a0ded2d41818eaF5dD6720bb464;
+        bytes memory params;
+
+        super._castVote(
+            _proposalId,
+            gpt_address,
+            proposalIdToChatGPT[_proposalId],
+            "reason",
+            params
+        );
+
         emit OCRResponse(requestId, response, err);
     }
 
@@ -283,7 +294,6 @@ contract GovernorContract is
         console.log("For: ", forVotes, "against: ", againstVotes);
         uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
         console.log("Result", result);
-        console.log(proposalIdToChatGPT[proposalId]);
 
         super._execute(proposalId, targets, values, calldatas, descriptionHash);
     }

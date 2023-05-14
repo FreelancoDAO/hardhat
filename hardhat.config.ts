@@ -8,6 +8,7 @@ import "solidity-coverage";
 import "solidity-docgen";
 import "hardhat-deploy";
 import { HardhatUserConfig } from "hardhat/config";
+import "@openzeppelin/hardhat-upgrades";
 
 // const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || ""
 // const SEPOLIA_RPC_URL =

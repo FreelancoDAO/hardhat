@@ -16,335 +16,466 @@ error Freelanco__DeadlineNotReached();
 error Freelanco__OnlyClientCanDoThisAction();
 
 contract Freelanco is Ownable {
-  using SafeMath for uint256;
+    using SafeMath for uint256;
 
-  mapping(uint256 => Offer) public offers;
-  mapping(uint256 => uint256) public _counterToOffers;
+    mapping(uint256 => Offer) public offers;
+    mapping(uint256 => uint256) public _counterToOffers;
 
-  uint256 public _counter;
-  uint256 public _disputeCounter;
-  GovernorContract governor;
-  Gig _nft_contract;
-  DAOReputationToken _reputation_contract;
-  uint256 private _daoChargesPercentage = 20;
-  uint8 constant SOLDIER_SHARE = 30;
-  uint8 constant MARINE_SHARE = 30;
-  uint8 constant CAPTAIN_SHARE = 40;
+    uint256 public _counter;
+    uint256 public _disputeCounter;
+    GovernorContract governor;
+    Gig _nft_contract;
+    DAOReputationToken _reputation_contract;
+    uint256 private _daoChargesPercentage = 20;
+    uint8 constant SOLDIER_SHARE = 30;
+    uint8 constant MARINE_SHARE = 30;
+    uint8 constant CAPTAIN_SHARE = 40;
 
-  struct Freelancer {
-    address _owner;
-    uint256 _lockedAmount;
-    uint256 _deadlineBlocks;
-  }
+    struct Freelancer {
+        address _owner;
+        uint256 _lockedAmount;
+        uint256 _deadlineBlocks;
+    }
 
-  struct Dispute {
-    uint256 proposalId;
-    address[] targets;
-    uint256[] values;
-    bytes[] calldatas;
-    string description;
-  }
+    struct Dispute {
+        uint256 proposalId;
+        address[] targets;
+        uint256[] values;
+        bytes[] calldatas;
+        string description;
+    }
 
-  mapping(uint256 => Dispute) public _counterToDispute;
-  mapping(address => Freelancer) public _freelancers;
+    mapping(uint256 => Dispute) public _counterToDispute;
+    mapping(address => Freelancer) public _freelancers;
 
-  event OfferSent(
-    uint256 _offerId,
-    uint256 indexed _gigTokenId,
-    address _freelancer,
-    address _client,
-    uint _amount,
-    uint _daoFees,
-    uint _deadline,
-    string _terms
-  );
-
-  event OfferStatusUpdated(uint indexed _offerId, Offer.ProposalStatus _status);
-
-  event ContractDisputed(uint indexed _offerId, uint indexed _proposalId, string _reason);
-
-  constructor(
-    GovernorContract _governorContract,
-    Gig _nftContractAddress,
-    DAOReputationToken _reputationContractAddress
-  ) {
-    governor = GovernorContract(_governorContract);
-    _nft_contract = Gig(_nftContractAddress);
-    _reputation_contract = DAOReputationToken(_reputationContractAddress);
-  }
-
-  function sendOffer(
-    uint256 _gigTokenId,
-    address _freelancer,
-    string memory _terms,
-    uint256 _deadlineBlocks
-  ) public payable {
-    _counter++;
-
-    uint256 _offerId = uint256(
-      keccak256(abi.encode(_gigTokenId, _freelancer, _terms, _deadlineBlocks))
+    event OfferSent(
+        uint256 _offerId,
+        uint256 indexed _gigTokenId,
+        address _freelancer,
+        address _client,
+        uint _amount,
+        uint _daoFees,
+        uint _deadline,
+        string _terms
     );
 
-    _counterToOffers[_counter] = _offerId;
-
-    uint256 _deadline = block.number + _deadlineBlocks;
-
-    uint256 _escrowedAmount = (((100 - _daoChargesPercentage) * msg.value) / 100);
-    uint256 _daoFees = msg.value - _escrowedAmount;
-
-    offers[_offerId] = new Offer(
-      _gigTokenId,
-      _freelancer,
-      msg.sender,
-      msg.value,
-      _daoFees,
-      _terms,
-      _deadline
+    event OfferStatusUpdated(
+        uint indexed _offerId,
+        Offer.ProposalStatus _status
     );
 
-    emit OfferSent(
-      _offerId,
-      _gigTokenId,
-      _freelancer,
-      msg.sender,
-      _escrowedAmount,
-      _daoFees,
-      _deadline,
-      _terms
+    event ContractDisputed(
+        uint indexed _offerId,
+        uint indexed _proposalId,
+        string _reason
     );
-  }
 
-  function rejectOffer(uint _offerId) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
-
-    if (msg.sender != offerDetails._freelancerAddress) {
-      revert Freelanco__OnlyFreelancerCanDoThisAction();
+    constructor(
+        GovernorContract _governorContract,
+        Gig _nftContractAddress,
+        DAOReputationToken _reputationContractAddress
+    ) {
+        governor = GovernorContract(_governorContract);
+        _nft_contract = Gig(_nftContractAddress);
+        _reputation_contract = DAOReputationToken(_reputationContractAddress);
     }
 
-    offerContract.rejectOffer();
+    function sendOffer(
+        uint256 _gigTokenId,
+        address _freelancer,
+        string memory _terms,
+        uint256 _deadlineBlocks
+    ) public payable {
+        _counter++;
 
-    (bool sent, ) = offerDetails._client.call{value: offerDetails._amountEscrowed}("");
-    if (sent != true) {
-      revert TransactionFailed();
+        uint256 _offerId = uint256(
+            keccak256(
+                abi.encode(_gigTokenId, _freelancer, _terms, _deadlineBlocks)
+            )
+        );
+
+        _counterToOffers[_counter] = _offerId;
+
+        uint256 _deadline = block.number + _deadlineBlocks;
+
+        uint256 _escrowedAmount = (((100 - _daoChargesPercentage) * msg.value) /
+            100);
+        uint256 _daoFees = msg.value - _escrowedAmount;
+
+        offers[_offerId] = new Offer(
+            _gigTokenId,
+            _freelancer,
+            msg.sender,
+            msg.value,
+            _daoFees,
+            _terms,
+            _deadline
+        );
+
+        emit OfferSent(
+            _offerId,
+            _gigTokenId,
+            _freelancer,
+            msg.sender,
+            _escrowedAmount,
+            _daoFees,
+            _deadline,
+            _terms
+        );
     }
 
-    emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Rejected);
-  }
+    function rejectOffer(uint _offerId) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-  function approveOffer(uint _offerId) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
-    if (msg.sender != offerDetails._freelancerAddress) {
-      revert Freelanco__OnlyFreelancerCanDoThisAction();
+        if (msg.sender != offerDetails._freelancerAddress) {
+            revert Freelanco__OnlyFreelancerCanDoThisAction();
+        }
+
+        offerContract.rejectOffer();
+
+        (bool sent, ) = offerDetails._client.call{
+            value: offerDetails._amountEscrowed
+        }("");
+        if (sent != true) {
+            revert TransactionFailed();
+        }
+
+        emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Rejected);
     }
 
-    offerContract.approveOffer();
+    function approveOffer(uint _offerId) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
+        if (msg.sender != offerDetails._freelancerAddress) {
+            revert Freelanco__OnlyFreelancerCanDoThisAction();
+        }
 
-    emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Approved);
-  }
+        offerContract.approveOffer();
 
-  function markComplete(uint _offerId) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
-
-    if (block.number > offerDetails._deadline) {
-      revert Freelanco__DeadlineNotReached();
+        emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Approved);
     }
 
-    if (msg.sender != offerDetails._freelancerAddress) {
-      revert Freelanco__OnlyFreelancerCanDoThisAction();
+    function markComplete(uint _offerId) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
+
+        if (block.number > offerDetails._deadline) {
+            revert Freelanco__DeadlineNotReached();
+        }
+
+        if (msg.sender != offerDetails._freelancerAddress) {
+            revert Freelanco__OnlyFreelancerCanDoThisAction();
+        }
+
+        offerContract.markComplete();
+
+        emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Completed);
     }
 
-    offerContract.markComplete();
+    function handleDeadlineCrossed(
+        uint _offerId,
+        bool extend,
+        uint extendedBlocks
+    ) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-    emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Completed);
-  }
+        if (block.number > offerDetails._deadline) {
+            revert Freelanco__DeadlineNotReached();
+        }
 
-  function handleDeadlineCrossed(uint _offerId, bool extend, uint extendedBlocks) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
+        if (msg.sender != offerDetails._client) {
+            revert Freelanco__OnlyFreelancerCanDoThisAction();
+        }
 
-    if (block.number > offerDetails._deadline) {
-      revert Freelanco__DeadlineNotReached();
+        if (extend) {
+            offerDetails._deadline = extendedBlocks;
+        } else {
+            (bool sent, ) = offerDetails._client.call{
+                value: offerDetails._amountEscrowed
+            }("");
+            if (sent != true) {
+                revert TransactionFailed();
+            }
+            console.log(
+                "Sent ",
+                offerDetails._amountEscrowed,
+                "To ",
+                offerDetails._client
+            );
+        }
     }
 
-    if (msg.sender != offerDetails._client) {
-      revert Freelanco__OnlyFreelancerCanDoThisAction();
+    function markSuccessful(uint _offerId) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
+        if (msg.sender != offerDetails._client) {
+            revert Freelanco__OnlyClientCanDoThisAction();
+        }
+
+        offerContract.markSuccessful();
+
+        (bool sent, ) = offerDetails._freelancerAddress.call{
+            value: offerDetails._amountEscrowed
+        }("");
+        if (sent != true) {
+            revert TransactionFailed();
+        }
+
+        emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Successful);
     }
 
-    if (extend) {
-      offerDetails._deadline = extendedBlocks;
-    } else {
-      (bool sent, ) = offerDetails._client.call{value: offerDetails._amountEscrowed}("");
-      if (sent != true) {
-        revert TransactionFailed();
-      }
-      console.log("Sent ", offerDetails._amountEscrowed, "To ", offerDetails._client);
-    }
-  }
+    function disputeContract(uint256 _offerId, string memory _reason) public {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-  function markSuccessful(uint _offerId) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
-    if (msg.sender != offerDetails._client) {
-      revert Freelanco__OnlyClientCanDoThisAction();
-    }
+        bytes[] memory datas = new bytes[](1);
 
-    offerContract.markSuccessful();
+        if (msg.sender == offerDetails._client) {
+            offerContract.disputeByClient();
 
-    (bool sent, ) = offerDetails._freelancerAddress.call{value: offerDetails._amountEscrowed}("");
-    if (sent != true) {
-      revert TransactionFailed();
-    }
+            datas[0] = abi.encodeWithSignature(
+                "handleDispute(uint256,address)",
+                _offerId,
+                offerDetails._client
+            );
 
-    emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Successful);
-  }
+            emit OfferStatusUpdated(
+                _offerId,
+                Offer.ProposalStatus.Over_By_Client
+            );
+        } else if (msg.sender == offerDetails._freelancerAddress) {
+            offerContract.disputeByFreelancer();
 
-  function disputeContract(uint256 _offerId, string memory _reason) public {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
+            datas[0] = abi.encodeWithSignature(
+                "handleDispute(uint256,address)",
+                _offerId,
+                offerDetails._freelancerAddress
+            );
 
-    bytes[] memory datas = new bytes[](1);
+            emit OfferStatusUpdated(
+                _offerId,
+                Offer.ProposalStatus.Over_By_Freelancer
+            );
+        } else {
+            revert Freelanco__ClientNeedsToEscrow();
+        }
 
-    if (msg.sender == offerDetails._client) {
-      offerContract.disputeByClient();
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
 
-      datas[0] = abi.encodeWithSignature(
-        "handleDispute(uint256,address)",
-        _offerId,
-        offerDetails._client
-      );
+        address[] memory targets = new address[](1);
+        targets[0] = address(this);
 
-      emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Over_By_Client);
-    } else if (msg.sender == offerDetails._freelancerAddress) {
-      offerContract.disputeByFreelancer();
+        governor.propose(targets, values, datas, _reason);
 
-      datas[0] = abi.encodeWithSignature(
-        "handleDispute(uint256,address)",
-        _offerId,
-        offerDetails._freelancerAddress
-      );
+        uint256 proposalId = governor.hashProposal(
+            targets,
+            values,
+            datas,
+            keccak256(bytes(_reason))
+        );
 
-      emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Over_By_Freelancer);
-    } else {
-      revert Freelanco__ClientNeedsToEscrow();
-    }
+        _disputeCounter++;
+        _counterToDispute[_disputeCounter] = Dispute(
+            proposalId,
+            targets,
+            values,
+            datas,
+            _reason
+        );
 
-    uint256[] memory values = new uint256[](1);
-    values[0] = 0;
-
-    address[] memory targets = new address[](1);
-    targets[0] = address(this);
-
-    governor.propose(targets, values, datas, _reason);
-
-    uint256 proposalId = governor.hashProposal(targets, values, datas, keccak256(bytes(_reason)));
-
-    _disputeCounter++;
-    _counterToDispute[_disputeCounter] = Dispute(proposalId, targets, values, datas, _reason);
-
-    emit ContractDisputed(_offerId, proposalId, _reason);
-  }
-
-  function withdraw() public onlyOwner {
-    // Get the current balance of the Freelanco contract
-    uint256 balance = address(this).balance;
-    require(balance > 0, "Freelanco: contract has no funds to distribute");
-
-    // Calculate the total number of NFT holders in each level
-    uint256 totalSoldiers = 0;
-    uint256 totalMarines = 0;
-    uint256 totalCaptains = 0;
-    address[] memory holders = _reputation_contract.getHolders();
-    for (uint256 i = 0; i < holders.length; i++) {
-      address holder = holders[i];
-      uint8 level = _reputation_contract.getRepo(holder);
-      if (level == 1) {
-        totalSoldiers++;
-      } else if (level == 2) {
-        totalMarines++;
-      } else if (level == 3) {
-        totalCaptains++;
-      }
+        emit ContractDisputed(_offerId, proposalId, _reason);
     }
 
-    // Calculate the amount of funds to distribute to each level
-    uint256 soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(totalSoldiers);
-    uint256 marinesShare = balance.mul(MARINE_SHARE).div(100).div(totalMarines);
-    uint256 captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(totalCaptains);
+    // function disputeContract(uint256 _offerId, string memory _reason) public {
+    //     Offer offerContract = Offer(offers[_offerId]);
+    //     Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-    // Distribute funds to each NFT holder based on their level
-    for (uint256 i = 0; i < holders.length; i++) {
-      address holder = holders[i];
-      uint8 level = _reputation_contract.getRepo(holder);
-      uint256 amount = 0;
-      if (level == 1) {
-        amount = soldiersShare;
-      } else if (level == 2) {
-        amount = marinesShare;
-      } else if (level == 3) {
-        amount = captainsShare;
-      }
-      if (amount > 0) {
-        payable(holder).transfer(amount); //change this
-      }
+    //     bytes[] memory datas = new bytes[](2);
+
+    //     if (msg.sender == offerDetails._client) {
+    //         offerContract.disputeByClient();
+
+    //         emit OfferStatusUpdated(
+    //             _offerId,
+    //             Offer.ProposalStatus.Over_By_Client
+    //         );
+    //     } else if (msg.sender == offerDetails._freelancerAddress) {
+    //         offerContract.disputeByFreelancer();
+
+    //         emit OfferStatusUpdated(
+    //             _offerId,
+    //             Offer.ProposalStatus.Over_By_Freelancer
+    //         );
+    //     } else {
+    //         revert Freelanco__ClientNeedsToEscrow();
+    //     }
+
+    //     datas[0] = abi.encodeWithSignature(
+    //         "handleDispute(uint256,address)",
+    //         _offerId,
+    //         offerDetails._freelancerAddress
+    //     );
+
+    //     datas[1] = abi.encodeWithSignature(
+    //         "handleDispute(uint256,address)",
+    //         _offerId,
+    //         offerDetails._client
+    //     );
+
+    //     uint256[] memory values = new uint256[](2);
+    //     values[0] = 0;
+    //     values[1] = 0;
+
+    //     address[] memory targets = new address[](2);
+    //     targets[0] = address(this);
+    //     targets[1] = address(this);
+
+    //     governor.propose(targets, values, datas, _reason);
+
+    //     uint256 proposalId = governor.hashProposal(
+    //         targets,
+    //         values,
+    //         datas,
+    //         keccak256(bytes(_reason))
+    //     );
+
+    //     _disputeCounter++;
+    //     _counterToDispute[_disputeCounter] = Dispute(
+    //         proposalId,
+    //         targets,
+    //         values,
+    //         datas,
+    //         _reason
+    //     );
+
+    //     emit ContractDisputed(_offerId, proposalId, _reason);
+    // }
+
+    function withdraw() public onlyOwner {
+        // Get the current balance of the Freelanco contract
+        uint256 balance = address(this).balance;
+        require(balance > 0, "Freelanco: contract has no funds to distribute");
+
+        // Calculate the total number of NFT holders in each level
+        uint256 totalSoldiers = 0;
+        uint256 totalMarines = 0;
+        uint256 totalCaptains = 0;
+        address[] memory holders = _reputation_contract.getHolders();
+        for (uint256 i = 0; i < holders.length; i++) {
+            address holder = holders[i];
+            uint8 level = _reputation_contract.getRepo(holder);
+            if (level == 1) {
+                totalSoldiers++;
+            } else if (level == 2) {
+                totalMarines++;
+            } else if (level == 3) {
+                totalCaptains++;
+            }
+        }
+
+        // Calculate the amount of funds to distribute to each level
+        uint256 soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(
+            totalSoldiers
+        );
+        uint256 marinesShare = balance.mul(MARINE_SHARE).div(100).div(
+            totalMarines
+        );
+        uint256 captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(
+            totalCaptains
+        );
+
+        // Distribute funds to each NFT holder based on their level
+        for (uint256 i = 0; i < holders.length; i++) {
+            address holder = holders[i];
+            uint8 level = _reputation_contract.getRepo(holder);
+            uint256 amount = 0;
+            if (level == 1) {
+                amount = soldiersShare;
+            } else if (level == 2) {
+                amount = marinesShare;
+            } else if (level == 3) {
+                amount = captainsShare;
+            }
+            if (amount > 0) {
+                payable(holder).transfer(amount); //change this
+            }
+        }
     }
-  }
 
-  function handleDispute(uint256 _offerId, address receiver) public onlyOwner {
-    Offer offerContract = Offer(offers[_offerId]);
-    Offer.Proposal memory offerDetails = offerContract.getDetails();
+    function handleDispute(
+        uint256 _offerId,
+        address receiver
+    ) public onlyOwner {
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-    if (offerDetails._freelancerAddress == receiver || offerDetails._client == receiver) {
-      (bool sent, ) = receiver.call{value: offerDetails._amountEscrowed}("");
-      if (sent != true) {
-        revert TransactionFailed();
-      }
-    } else {
-      revert TransactionFailed();
+        if (
+            offerDetails._freelancerAddress == receiver ||
+            offerDetails._client == receiver
+        ) {
+            (bool sent, ) = receiver.call{value: offerDetails._amountEscrowed}(
+                ""
+            );
+            if (sent != true) {
+                revert TransactionFailed();
+            }
+        } else {
+            revert TransactionFailed();
+        }
+
+        offerContract.disputeResolved();
+
+        emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Dispute_Over);
     }
 
-    offerContract.disputeResolved();
-
-    emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Dispute_Over);
-  }
-
-  function boostProfile(uint256 _deadlineBlocks) public payable {
-    _freelancers[msg.sender] = Freelancer(msg.sender, msg.value, _deadlineBlocks);
-  }
-
-  function withdrawLockedFreelancerAmount() public {
-    if (_freelancers[msg.sender]._lockedAmount == 0) {
-      revert TransactionFailed();
+    function boostProfile(uint256 _deadlineBlocks) public payable {
+        _freelancers[msg.sender] = Freelancer(
+            msg.sender,
+            msg.value,
+            _deadlineBlocks
+        );
     }
-    if (_freelancers[msg.sender]._deadlineBlocks < block.number) {
-      revert TransactionFailed();
+
+    function withdrawLockedFreelancerAmount() public {
+        if (_freelancers[msg.sender]._lockedAmount == 0) {
+            revert TransactionFailed();
+        }
+        if (_freelancers[msg.sender]._deadlineBlocks < block.number) {
+            revert TransactionFailed();
+        }
+        (bool sent, ) = msg.sender.call{
+            value: _freelancers[msg.sender]._lockedAmount
+        }("");
+        if (sent != true) {
+            revert TransactionFailed();
+        }
     }
-    (bool sent, ) = msg.sender.call{value: _freelancers[msg.sender]._lockedAmount}("");
-    if (sent != true) {
-      revert TransactionFailed();
+
+    function updateDAOPercentage(uint256 _newPercentage) public onlyOwner {
+        _daoChargesPercentage = _newPercentage;
     }
-  }
 
-  function updateDAOPercentage(uint256 _newPercentage) public onlyOwner {
-    _daoChargesPercentage = _newPercentage;
-  }
+    function getFreelancersLockedAmount(
+        address _freelancer
+    ) public returns (Freelancer memory) {
+        return _freelancers[_freelancer];
+    }
 
-  function getFreelancersLockedAmount(address _freelancer) public returns (Freelancer memory) {
-    return _freelancers[_freelancer];
-  }
+    //VIEW
+    function getOfferContract(uint256 _offerId) public view returns (address) {
+        return address(offers[_offerId]);
+    }
 
-  //VIEW
-  function getOfferContract(uint256 _offerId) public view returns (address) {
-    return address(offers[_offerId]);
-  }
+    function getOfferId(uint256 _counterIdx) public view returns (uint256) {
+        return _counterToOffers[_counterIdx];
+    }
 
-  function getOfferId(uint256 _counterIdx) public view returns (uint256) {
-    return _counterToOffers[_counterIdx];
-  }
-
-  function getDispute(uint256 _counterIdx) public view returns (Dispute memory) {
-    return _counterToDispute[_counterIdx];
-  }
+    function getDispute(
+        uint256 _counterIdx
+    ) public view returns (Dispute memory) {
+        return _counterToDispute[_counterIdx];
+    }
 }
