@@ -4,5 +4,4 @@ cache/
 docs/
 typechain-types/
 yarn.lock
-deploy/
 deployments/

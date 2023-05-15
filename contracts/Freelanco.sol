@@ -43,6 +43,8 @@ contract Freelanco is Ownable {
         uint256[] values;
         bytes[] calldatas;
         string description;
+        uint256 offerID;
+        address disputingParty;
     }
 
     mapping(uint256 => Dispute) public _counterToDispute;
@@ -283,76 +285,133 @@ contract Freelanco is Ownable {
             targets,
             values,
             datas,
-            _reason
+            _reason,
+            _offerId,
+            msg.sender
         );
 
         emit ContractDisputed(_offerId, proposalId, _reason);
     }
 
-    // function disputeContract(uint256 _offerId, string memory _reason) public {
-    //     Offer offerContract = Offer(offers[_offerId]);
-    //     Offer.Proposal memory offerDetails = offerContract.getDetails();
+    function getDisputedFunds(uint256 _disputeCounterArg) public {
+        console.log(
+            "proposal id:",
+            _counterToDispute[_disputeCounterArg].proposalId
+        );
+        Dispute storage dispute = _counterToDispute[_disputeCounterArg];
 
-    //     bytes[] memory datas = new bytes[](2);
+        Offer offerContract = Offer(offers[dispute.offerID]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-    //     if (msg.sender == offerDetails._client) {
-    //         offerContract.disputeByClient();
+        if (governor.getGPTIsVoted(dispute.proposalId)) {
+            if (uint256(governor.state(dispute.proposalId)) == 7) {
+                // this means majory voted for and if gpt voted against,
+                //it was still executed but money is still needs to be transfered
+                if (governor.getShouldTransfer(dispute.proposalId)) {
+                    console.log(
+                        "proposal state",
+                        uint256(governor.state(dispute.proposalId))
+                    );
+                    console.log("disputed by:", dispute.disputingParty);
+                    console.log("frealancer", offerDetails._freelancerAddress);
+                    console.log("client:", offerDetails._client);
 
-    //         emit OfferStatusUpdated(
-    //             _offerId,
-    //             Offer.ProposalStatus.Over_By_Client
-    //         );
-    //     } else if (msg.sender == offerDetails._freelancerAddress) {
-    //         offerContract.disputeByFreelancer();
+                    //since disputed party did not win the proposal in that case
 
-    //         emit OfferStatusUpdated(
-    //             _offerId,
-    //             Offer.ProposalStatus.Over_By_Freelancer
-    //         );
-    //     } else {
-    //         revert Freelanco__ClientNeedsToEscrow();
-    //     }
+                    address receiver;
+                    if (
+                        offerDetails._freelancerAddress ==
+                        dispute.disputingParty
+                    ) {
+                        receiver = offerDetails._client;
+                    } else {
+                        receiver = offerDetails._freelancerAddress;
+                    }
 
-    //     datas[0] = abi.encodeWithSignature(
-    //         "handleDispute(uint256,address)",
-    //         _offerId,
-    //         offerDetails._freelancerAddress
-    //     );
+                    console.log("receiver:", receiver);
+                    console.log("amount:", offerDetails._amountEscrowed);
 
-    //     datas[1] = abi.encodeWithSignature(
-    //         "handleDispute(uint256,address)",
-    //         _offerId,
-    //         offerDetails._client
-    //     );
+                    //if executed before, gpt would say send money to disclosing party
 
-    //     uint256[] memory values = new uint256[](2);
-    //     values[0] = 0;
-    //     values[1] = 0;
+                    if (
+                        uint256(
+                            governor.getShouldTransferTo(dispute.proposalId)
+                        ) == 1
+                    ) {
+                        (bool sent, ) = receiver.call{
+                            value: offerDetails._amountEscrowed
+                        }("");
+                        if (sent != true) {
+                            revert TransactionFailed();
+                        }
 
-    //     address[] memory targets = new address[](2);
-    //     targets[0] = address(this);
-    //     targets[1] = address(this);
+                        console.log("tx sent");
 
-    //     governor.propose(targets, values, datas, _reason);
+                        offerContract.disputeResolved();
 
-    //     uint256 proposalId = governor.hashProposal(
-    //         targets,
-    //         values,
-    //         datas,
-    //         keccak256(bytes(_reason))
-    //     );
+                        emit OfferStatusUpdated(
+                            dispute.offerID,
+                            Offer.ProposalStatus.Dispute_Over
+                        );
+                    } else {
+                        console.log(
+                            "Money already transferd to disputing party"
+                        );
+                    }
+                }
 
-    //     _disputeCounter++;
-    //     _counterToDispute[_disputeCounter] = Dispute(
-    //         proposalId,
-    //         targets,
-    //         values,
-    //         datas,
-    //         _reason
-    //     );
+                // console.log(offerDetails);
+            } else if (uint256(governor.state(dispute.proposalId)) == 3) {
+                if (governor.getShouldTransfer(dispute.proposalId)) {
+                    address receiver;
+                    if (
+                        uint256(
+                            governor.getShouldTransferTo(dispute.proposalId)
+                        ) == 0
+                    ) {
+                        //transfer to disputing party
+                        if (
+                            offerDetails._freelancerAddress ==
+                            dispute.disputingParty
+                        ) {
+                            receiver = offerDetails._freelancerAddress;
+                        } else {
+                            receiver = offerDetails._client;
+                        }
+                    } else {
+                        //transfer to against party
+                        if (
+                            offerDetails._freelancerAddress ==
+                            dispute.disputingParty
+                        ) {
+                            receiver = offerDetails._client;
+                        } else {
+                            receiver = offerDetails._freelancerAddress;
+                        }
+                    }
 
-    //     emit ContractDisputed(_offerId, proposalId, _reason);
-    // }
+                    (bool sent, ) = receiver.call{
+                        value: offerDetails._amountEscrowed
+                    }("");
+                    if (sent != true) {
+                        revert TransactionFailed();
+                    }
+
+                    console.log("disputing party:", dispute.disputingParty);
+                    console.log("frealancer", offerDetails._freelancerAddress);
+                    console.log("client:", offerDetails._client);
+                    console.log("tx sent to", receiver);
+
+                    offerContract.disputeResolved();
+
+                    emit OfferStatusUpdated(
+                        dispute.offerID,
+                        Offer.ProposalStatus.Dispute_Over
+                    );
+                }
+            }
+        }
+    }
 
     function withdraw() public onlyOwner {
         // Get the current balance of the Freelanco contract

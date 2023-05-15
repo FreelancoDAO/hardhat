@@ -28,4 +28,4 @@
 //   return Functions.encodeUint256(1);
 // }
 
-return Functions.encodeUint256(1);
+return Functions.encodeUint256(0);

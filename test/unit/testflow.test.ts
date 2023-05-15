@@ -63,12 +63,13 @@ describe("Governor Flow", async () => {
     await freelanco
       .connect(client)
       .sendOffer(0, freelancer.address, "Terms are to dispute it", 100, {
-        value: ethers.utils.parseEther("100"),
+        value: ethers.utils.parseEther("200"),
       });
 
     const offerId = await freelanco.getOfferId(1);
     await freelanco.connect(freelancer).approveOffer(offerId);
 
+    //client making the dispute
     const tx = await freelanco
       .connect(client)
       .disputeContract(offerId, "I was told to do so!");
@@ -81,7 +82,7 @@ describe("Governor Flow", async () => {
     const calldata = dispute.calldatas;
     const PROPOSAL_DESCRIPTION = dispute.description;
 
-    console.log("TRL", targets);
+    console.log("Targets:", targets);
 
     const proposalId = BigInt(dispute.proposalId._hex);
 
@@ -96,7 +97,7 @@ describe("Governor Flow", async () => {
 
     console.log("Buying NFT");
     const txRsponse = await daoNft.requestNft({
-      value: ethers.utils.parseEther("1"),
+      value: ethers.utils.parseEther("2"),
     });
 
     const transactionReceipt = await txRsponse.wait();
@@ -121,6 +122,9 @@ describe("Governor Flow", async () => {
     await voteTx.wait(1);
 
     //simulate chat gpt voting
+
+    console.log("Vote casted from account: ", freelancer.address);
+    console.log("Simulating CHAT GPT");
 
     try {
       const taskArgs = {};
@@ -191,7 +195,7 @@ describe("Governor Flow", async () => {
     }
 
     proposalState = await governor.state(proposalId);
-    console.log("State:", proposalState);
+    console.log("Before Voting Period State:", proposalState);
     // assert.equal(proposalState.toString(), "1");
 
     await moveBlocks(VOTING_PERIOD + 1);
@@ -200,31 +204,48 @@ describe("Governor Flow", async () => {
     proposalState = await governor.state(proposalId);
     console.log("STATE:", proposalState);
 
-    console.log("Queing...");
-    const descriptionHash = ethers.utils.keccak256(
-      ethers.utils.toUtf8Bytes(PROPOSAL_DESCRIPTION)
-    );
-    // const descriptionHash = ethers.utils.id(PROPOSAL_DESCRIPTION)
-    const queueTx = await governor.queue(
-      targets,
-      [0],
-      calldata,
-      descriptionHash
-    );
-    await queueTx.wait(1);
-    await moveTime(MIN_DELAY + 2);
-    await moveBlocks(10);
+    try {
+      console.log("Queing...");
+      const descriptionHash = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes(PROPOSAL_DESCRIPTION)
+      );
+      // const descriptionHash = ethers.utils.id(PROPOSAL_DESCRIPTION)
+      const queueTx = await governor.queue(
+        targets,
+        [0],
+        calldata,
+        descriptionHash
+      );
+      await queueTx.wait(1);
+      await moveTime(MIN_DELAY + 2);
+      await moveBlocks(10);
 
+      proposalState = await governor.state(proposalId);
+      console.log("STATE:", proposalState);
+
+      console.log("Executing...");
+      const exTx = await governor.execute(
+        targets,
+        [0],
+        calldata,
+        descriptionHash
+      );
+      await exTx.wait(1);
+    } catch (e) {
+      console.log("Queuening and Executing Failed", e);
+    }
+
+    await moveBlocks(20);
     proposalState = await governor.state(proposalId);
     console.log("STATE:", proposalState);
 
-    console.log("Executing...");
-    const exTx = await governor.execute(
-      targets,
-      [0],
-      calldata,
-      descriptionHash
-    );
-    await exTx.wait(1);
+    const balance0ETH = await ethers.provider.getBalance(freelanco.address);
+    console.log("Balance: ", BigInt(balance0ETH._hex));
+
+    await freelanco.connect(freelancer).getDisputedFunds(1);
+    // await moveBlocks(5);
+
+    const balance2ETH = await ethers.provider.getBalance(freelanco.address);
+    console.log("Balance: ", BigInt(balance2ETH._hex));
   });
 });

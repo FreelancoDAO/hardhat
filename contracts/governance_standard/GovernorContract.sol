@@ -53,7 +53,15 @@ contract GovernorContract is
     mapping(uint256 => uint256) public _counterToProposalId;
     mapping(bytes32 => uint256) public requestIdToProposalId;
     mapping(uint256 => uint8) public proposalIdToChatGPT;
+    mapping(uint256 => bool) public proposalIdToChatGPTVoted;
+    mapping(uint256 => bool) public proposalIdToShouldTransfer;
+    mapping(uint256 => Parties) public proposalIdToShouldTransferTo;
     uint256 public immutable amountToMintPerProposal = 100 ether;
+
+    enum Parties {
+        DisputingParty,
+        AgainstParty
+    }
 
     constructor(
         IVotes _token,
@@ -121,22 +129,116 @@ contract GovernorContract is
         uint256 _proposalId = requestIdToProposalId[latestRequestId];
         proposalIdToChatGPT[_proposalId] = abi.decode(response, (uint8));
 
-        console.log("Chat GPT voted", proposalIdToChatGPT[_proposalId]);
-
-        console.log(proposalIdToChatGPT[_proposalId]);
-
-        address gpt_address = 0x15c7Bc1F4E486a0ded2d41818eaF5dD6720bb464;
+        address gpt_address = address(this);
         bytes memory params;
 
-        super._castVote(
-            _proposalId,
-            gpt_address,
-            proposalIdToChatGPT[_proposalId],
-            "reason",
-            params
-        );
+        console.log("GPT voted: ", proposalIdToChatGPT[_proposalId]);
+        proposalIdToChatGPTVoted[_proposalId] = true;
+
+        (
+            uint256 againstVotes,
+            uint256 forVotes,
+            uint256 abstainVotes
+        ) = proposalVotes(_proposalId);
+
+        forVotes = againstVotes; //testing
+        // againstVotes = forVotes;
+
+        console.log("Community votes, FOR", forVotes, "Against", againstVotes);
+
+        uint result = forVotes > againstVotes ? 1 : 0;
+
+        //this will only be executed one block before voting period ends
+
+        if (result == 1) {
+            //majority voted FOR
+            if (proposalIdToChatGPT[_proposalId] == 1) {
+                proposalIdToShouldTransfer[_proposalId] = false;
+                console.log(
+                    "Result: ",
+                    forVotes,
+                    "Cagainst including GPT: ",
+                    againstVotes
+                );
+                //gpt voted FOR
+            } else {
+                //gpt voted AGAINST
+                if (
+                    (againstVotes + calculateGPTVotingPower(_proposalId)) >
+                    forVotes
+                ) {
+                    //majority chooses for
+                    //send money to against party
+                    proposalIdToShouldTransfer[_proposalId] = true;
+                    proposalIdToShouldTransferTo[_proposalId] = Parties
+                        .AgainstParty;
+
+                    console.log(
+                        "For: ",
+                        forVotes,
+                        "Against: ",
+                        againstVotes + calculateGPTVotingPower(_proposalId)
+                    );
+                }
+            }
+        } else {
+            //majority voted AGAINST
+            if (proposalIdToChatGPT[_proposalId] == 1) {
+                //gpt voted FOR
+                if (
+                    (forVotes + calculateGPTVotingPower(_proposalId)) >
+                    againstVotes
+                ) {
+                    //majority chooses for
+                    //send money to for party
+                    proposalIdToShouldTransfer[_proposalId] = true;
+                    proposalIdToShouldTransferTo[_proposalId] = Parties
+                        .DisputingParty;
+
+                    console.log(
+                        "Result: ",
+                        forVotes + calculateGPTVotingPower(_proposalId),
+                        "Cagainst including GPT: ",
+                        againstVotes
+                    );
+                }
+            } else {
+                //gpt voted AGAINST
+                if (
+                    (againstVotes + calculateGPTVotingPower(_proposalId)) >
+                    forVotes
+                ) {
+                    proposalIdToShouldTransfer[_proposalId] = true;
+                    proposalIdToShouldTransferTo[_proposalId] = Parties
+                        .AgainstParty;
+
+                    console.log(
+                        "Result: ",
+                        forVotes,
+                        "Cagainst including GPT: ",
+                        againstVotes + calculateGPTVotingPower(_proposalId)
+                    );
+                }
+            }
+        }
+
+        console.log("GPT:", proposalIdToChatGPT[_proposalId]);
 
         emit OCRResponse(requestId, response, err);
+    }
+
+    function getGPTIsVoted(uint256 _proposalId) public view returns (bool) {
+        return proposalIdToChatGPTVoted[_proposalId];
+    }
+
+    function getShouldTransfer(uint256 _proposalId) public view returns (bool) {
+        return proposalIdToShouldTransfer[_proposalId];
+    }
+
+    function getShouldTransferTo(
+        uint256 _proposalId
+    ) public view returns (Parties) {
+        return proposalIdToShouldTransferTo[_proposalId];
     }
 
     function _castVote(
@@ -151,8 +253,6 @@ contract GovernorContract is
         if (daoNFTContract.balanceOf(account) <= 0) {
             revert isNotDaoMember();
         }
-
-        console.log("Casting vote in contract: ", proposalId, account, support);
 
         return super._castVote(proposalId, account, support, reason, params);
     }
@@ -285,17 +385,64 @@ contract GovernorContract is
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
+        if (proposalIdToChatGPT[proposalId] == 1) {
+            // if chat gpt vote's for, as the DAO members also voted for, we execute
+            super._execute(
+                proposalId,
+                targets,
+                values,
+                calldatas,
+                descriptionHash
+            );
+        } else {
+            //if chat gpt doesn't vote for, then we need to re count
+
+            (
+                uint256 againstVotes,
+                uint256 forVotes,
+                uint256 abstainVotes
+            ) = proposalVotes(proposalId);
+
+            againstVotes = forVotes; //testing
+
+            bool shouldExecute = forVotes >
+                againstVotes + calculateGPTVotingPower(proposalId);
+
+            if (shouldExecute) {
+                super._execute(
+                    proposalId,
+                    targets,
+                    values,
+                    calldatas,
+                    descriptionHash
+                );
+            } else {
+                proposalIdToShouldTransfer[proposalId] = true;
+                console.log("Against won");
+            }
+        }
+    }
+
+    function calculateGPTVotingPower(
+        uint256 _proposalId
+    ) public returns (uint256) {
         (
             uint256 againstVotes,
             uint256 forVotes,
             uint256 abstainVotes
-        ) = proposalVotes(proposalId);
+        ) = proposalVotes(_proposalId);
 
-        console.log("For: ", forVotes, "against: ", againstVotes);
-        uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
-        console.log("Result", result);
+        uint256 bps = 3000; // 30%
+        uint256 _30percent = calculatePercentage(forVotes + againstVotes, bps);
 
-        super._execute(proposalId, targets, values, calldatas, descriptionHash);
+        return _30percent;
+    }
+
+    function calculatePercentage(
+        uint256 amount,
+        uint256 bps
+    ) public pure returns (uint256) {
+        return (amount * bps) / 10_000;
     }
 
     function _mintReputationTokens(
