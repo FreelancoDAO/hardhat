@@ -132,7 +132,6 @@ contract GovernorContract is
         address gpt_address = address(this);
         bytes memory params;
 
-        console.log("GPT voted: ", proposalIdToChatGPT[_proposalId]);
         proposalIdToChatGPTVoted[_proposalId] = true;
 
         (
@@ -141,25 +140,13 @@ contract GovernorContract is
             uint256 abstainVotes
         ) = proposalVotes(_proposalId);
 
-        forVotes = againstVotes; //testing
-        // againstVotes = forVotes;
-
-        console.log("Community votes, FOR", forVotes, "Against", againstVotes);
-
         uint result = forVotes > againstVotes ? 1 : 0;
-
-        //this will only be executed one block before voting period ends
 
         if (result == 1) {
             //majority voted FOR
             if (proposalIdToChatGPT[_proposalId] == 1) {
                 proposalIdToShouldTransfer[_proposalId] = false;
-                console.log(
-                    "Result: ",
-                    forVotes,
-                    "Cagainst including GPT: ",
-                    againstVotes
-                );
+
                 //gpt voted FOR
             } else {
                 //gpt voted AGAINST
@@ -172,13 +159,6 @@ contract GovernorContract is
                     proposalIdToShouldTransfer[_proposalId] = true;
                     proposalIdToShouldTransferTo[_proposalId] = Parties
                         .AgainstParty;
-
-                    console.log(
-                        "For: ",
-                        forVotes,
-                        "Against: ",
-                        againstVotes + calculateGPTVotingPower(_proposalId)
-                    );
                 }
             }
         } else {
@@ -194,13 +174,6 @@ contract GovernorContract is
                     proposalIdToShouldTransfer[_proposalId] = true;
                     proposalIdToShouldTransferTo[_proposalId] = Parties
                         .DisputingParty;
-
-                    console.log(
-                        "Result: ",
-                        forVotes + calculateGPTVotingPower(_proposalId),
-                        "Cagainst including GPT: ",
-                        againstVotes
-                    );
                 }
             } else {
                 //gpt voted AGAINST
@@ -211,18 +184,11 @@ contract GovernorContract is
                     proposalIdToShouldTransfer[_proposalId] = true;
                     proposalIdToShouldTransferTo[_proposalId] = Parties
                         .AgainstParty;
-
-                    console.log(
-                        "Result: ",
-                        forVotes,
-                        "Cagainst including GPT: ",
-                        againstVotes + calculateGPTVotingPower(_proposalId)
-                    );
                 }
             }
         }
 
-        console.log("GPT:", proposalIdToChatGPT[_proposalId]);
+        console.log("GPT VOTED", proposalIdToChatGPT[_proposalId]);
 
         emit OCRResponse(requestId, response, err);
     }
@@ -403,8 +369,6 @@ contract GovernorContract is
                 uint256 abstainVotes
             ) = proposalVotes(proposalId);
 
-            againstVotes = forVotes; //testing
-
             bool shouldExecute = forVotes >
                 againstVotes + calculateGPTVotingPower(proposalId);
 
@@ -418,7 +382,6 @@ contract GovernorContract is
                 );
             } else {
                 proposalIdToShouldTransfer[proposalId] = true;
-                console.log("Against won");
             }
         }
     }

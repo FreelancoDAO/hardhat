@@ -1,4 +1,9 @@
-// const prompt = args[0];
+const prompt = args[0];
+const proposalId = args[1];
+
+console.log("hash prompt:", prompt);
+
+console.log("proposalId:", proposalId);
 
 // if (!secrets.openaiKey) {
 //   throw Error("Need to set OPENAI_KEY environment variable");
@@ -13,8 +18,8 @@
 //   data: {
 //     model: "curie:ft-personal-2023-05-13-23-00-29",
 //     prompt: prompt,
-//     temperature: 1,
-//     max_tokens: 2,
+//     temperature: 0,
+//     max_tokens: 1,
 //   },
 // });
 
@@ -23,9 +28,9 @@
 
 // const result = openAiResponse.data.choices[0].text;
 // if (result.includes("client")) {
-//   return Functions.encodeUint256(0);
-// } else {
 //   return Functions.encodeUint256(1);
+// } else {
+//   return Functions.encodeUint256(0);
 // }
 
 return Functions.encodeUint256(0);

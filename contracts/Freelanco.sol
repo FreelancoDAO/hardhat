@@ -72,6 +72,17 @@ contract Freelanco is Ownable {
         string _reason
     );
 
+    event FreelancerBoostedProfile(
+        address indexed freelancerAddress,
+        uint indexed _msgValue,
+        uint _deadlineBlock
+    );
+
+    event FreelancerWithrewLockedFunds(
+        address indexed freelancerAddress,
+        uint _amount
+    );
+
     constructor(
         GovernorContract _governorContract,
         Gig _nftContractAddress,
@@ -100,8 +111,11 @@ contract Freelanco is Ownable {
 
         uint256 _deadline = block.number + _deadlineBlocks;
 
-        uint256 _escrowedAmount = (((100 - _daoChargesPercentage) * msg.value) /
-            100);
+        uint256 bps = 9000; // 30%
+        uint256 _90percent = calculatePercentage(msg.value, bps);
+
+        uint256 _escrowedAmount = _90percent;
+
         uint256 _daoFees = msg.value - _escrowedAmount;
 
         offers[_offerId] = new Offer(
@@ -124,6 +138,13 @@ contract Freelanco is Ownable {
             _deadline,
             _terms
         );
+    }
+
+    function calculatePercentage(
+        uint256 amount,
+        uint256 bps
+    ) public pure returns (uint256) {
+        return (amount * bps) / 10_000;
     }
 
     function rejectOffer(uint _offerId) public {
@@ -491,11 +512,17 @@ contract Freelanco is Ownable {
     }
 
     function boostProfile(uint256 _deadlineBlocks) public payable {
+        if (msg.value <= 0) {
+            revert TransactionFailed();
+        }
+
         _freelancers[msg.sender] = Freelancer(
             msg.sender,
             msg.value,
             _deadlineBlocks
         );
+
+        emit FreelancerBoostedProfile(msg.sender, msg.value, _deadlineBlocks);
     }
 
     function withdrawLockedFreelancerAmount() public {
@@ -511,6 +538,11 @@ contract Freelanco is Ownable {
         if (sent != true) {
             revert TransactionFailed();
         }
+
+        emit FreelancerWithrewLockedFunds(
+            msg.sender,
+            _freelancers[msg.sender]._lockedAmount
+        );
     }
 
     function updateDAOPercentage(uint256 _newPercentage) public onlyOwner {

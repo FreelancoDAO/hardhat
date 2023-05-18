@@ -36,7 +36,7 @@ describe("Governor Flow", async () => {
   let freelanco: Freelanco;
   let daoNft: DaoNFT;
   let vrf: VRFCoordinatorV2Mock;
-  const voteWay = 1; // for
+  const voteWay = 0; // for
   const reason = "I lika do da cha cha";
   beforeEach(async () => {
     await deployments.fixture(["all"]);
