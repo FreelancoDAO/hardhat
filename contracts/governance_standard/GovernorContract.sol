@@ -12,14 +12,18 @@ import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 
+import "../Freelanco.sol";
 import "../DAOReputationToken.sol";
 import "../DAONFT.sol";
+import "../Offer.sol";
 import "hardhat/console.sol";
 
 error ChatGPTDidntVoteYet();
 error ThresholdReached();
 error isNotDaoMember();
 error ProposalNeedsToBeQueued();
+error GPTCantVoteDueToInvalidProposal();
+error GPTCantVoteDueToProposalStillInVotingPeriod();
 
 contract GovernorContract is
     Governor,
@@ -45,10 +49,19 @@ contract GovernorContract is
         address account;
         uint256 support;
     }
+    struct ProposalData {
+        uint256 block_number;
+        uint256 _id;
+        bool shouldGPTVote;
+        address[] targets;
+        bytes[] calldatas;
+    }
 
     uint256 public counter = 0;
     DAOReputationToken public reputationContract;
     DaoNFT public daoNFTContract;
+    Freelanco public freelancoContract;
+
     mapping(uint256 => VoterDetails[]) public voters;
     mapping(uint256 => uint256) public _counterToProposalId;
     mapping(bytes32 => uint256) public requestIdToProposalId;
@@ -56,6 +69,8 @@ contract GovernorContract is
     mapping(uint256 => bool) public proposalIdToChatGPTVoted;
     mapping(uint256 => bool) public proposalIdToShouldTransfer;
     mapping(uint256 => Parties) public proposalIdToShouldTransferTo;
+    mapping(uint256 => bool) public proposalIdToShouldGPTVote;
+    mapping(uint256 => ProposalData) public proposalIdToData;
     uint256 public immutable amountToMintPerProposal = 100 ether;
 
     enum Parties {
@@ -101,6 +116,18 @@ contract GovernorContract is
         uint32 gasLimit,
         uint256 proposalId
     ) public returns (bytes32) {
+        ProposalData memory data = proposalIdToData[proposalId];
+
+        if (!data.shouldGPTVote) {
+            revert GPTCantVoteDueToInvalidProposal();
+        }
+
+        if (
+            data.block_number + votingDelay() + votingPeriod() + 1 <
+            block.number
+        ) {
+            revert GPTCantVoteDueToProposalStillInVotingPeriod();
+        }
         Functions.Request memory req;
         req.initializeRequest(
             Functions.Location.Inline,
@@ -116,6 +143,7 @@ contract GovernorContract is
 
         latestRequestId = assignedReqID;
         requestIdToProposalId[latestRequestId] = proposalId;
+
         return assignedReqID;
     }
 
@@ -129,9 +157,6 @@ contract GovernorContract is
         uint256 _proposalId = requestIdToProposalId[latestRequestId];
         proposalIdToChatGPT[_proposalId] = abi.decode(response, (uint8));
 
-        address gpt_address = address(this);
-        bytes memory params;
-
         proposalIdToChatGPTVoted[_proposalId] = true;
 
         (
@@ -140,25 +165,77 @@ contract GovernorContract is
             uint256 abstainVotes
         ) = proposalVotes(_proposalId);
 
-        uint result = forVotes > againstVotes ? 1 : 0;
+        uint result = forVotes >= againstVotes ? 1 : 0;
 
         if (result == 1) {
             //majority voted FOR
             if (proposalIdToChatGPT[_proposalId] == 1) {
-                proposalIdToShouldTransfer[_proposalId] = false;
-
                 //gpt voted FOR
+
+                console.log("CASE 1 ");
+
+                ProposalData memory data = proposalIdToData[_proposalId];
+                address[] memory targets = new address[](1);
+                targets[0] = data.targets[0];
+
+                uint256[] memory values = new uint256[](1);
+                values[0] = 0;
+
+                bytes[] memory datas = new bytes[](1);
+                datas[0] = data.calldatas[0];
+
+                super._execute(_proposalId, targets, values, datas, "reason");
+
+                // if (success != true) {
+                //     revert TransactionFailed();
+                // }
             } else {
                 //gpt voted AGAINST
                 if (
                     (againstVotes + calculateGPTVotingPower(_proposalId)) >
                     forVotes
                 ) {
-                    //majority chooses for
-                    //send money to against party
-                    proposalIdToShouldTransfer[_proposalId] = true;
-                    proposalIdToShouldTransferTo[_proposalId] = Parties
-                        .AgainstParty;
+                    // after recounting, AGAINST WON
+
+                    console.log("CASE 2");
+                    ProposalData memory data = proposalIdToData[_proposalId];
+                    address[] memory targets = new address[](1);
+                    targets[0] = data.targets[0];
+
+                    uint256[] memory values = new uint256[](1);
+                    values[0] = 0;
+
+                    bytes[] memory datas = new bytes[](1);
+                    datas[0] = data.calldatas[1];
+
+                    super._execute(
+                        _proposalId,
+                        targets,
+                        values,
+                        datas,
+                        "reason"
+                    );
+                } else {
+                    // after recounting, FOR WON
+                    ProposalData memory data = proposalIdToData[_proposalId];
+                    address[] memory targets = new address[](1);
+                    targets[0] = data.targets[0];
+
+                    console.log("CASE 3");
+
+                    uint256[] memory values = new uint256[](1);
+                    values[0] = 0;
+
+                    bytes[] memory datas = new bytes[](1);
+                    datas[0] = data.calldatas[0];
+
+                    super._execute(
+                        _proposalId,
+                        targets,
+                        values,
+                        datas,
+                        "reason"
+                    );
                 }
             }
         } else {
@@ -169,32 +246,77 @@ contract GovernorContract is
                     (forVotes + calculateGPTVotingPower(_proposalId)) >
                     againstVotes
                 ) {
-                    //majority chooses for
-                    //send money to for party
-                    proposalIdToShouldTransfer[_proposalId] = true;
-                    proposalIdToShouldTransferTo[_proposalId] = Parties
-                        .DisputingParty;
+                    //after recounting, FOR WON
+                    ProposalData memory data = proposalIdToData[_proposalId];
+                    address[] memory targets = new address[](1);
+                    targets[0] = data.targets[0];
+
+                    uint256[] memory values = new uint256[](1);
+                    values[0] = 0;
+
+                    console.log("CASE 4");
+
+                    bytes[] memory datas = new bytes[](1);
+                    datas[0] = data.calldatas[0];
+
+                    super._execute(
+                        _proposalId,
+                        targets,
+                        values,
+                        datas,
+                        "reason"
+                    );
+                } else {
+                    //after recounting, AGAINST WON
+                    ProposalData memory data = proposalIdToData[_proposalId];
+                    address[] memory targets = new address[](1);
+                    targets[0] = data.targets[0];
+
+                    uint256[] memory values = new uint256[](1);
+                    values[0] = 0;
+
+                    console.log("CASE 5");
+
+                    bytes[] memory datas = new bytes[](1);
+                    datas[0] = data.calldatas[1];
+
+                    super._execute(
+                        _proposalId,
+                        targets,
+                        values,
+                        datas,
+                        "reason"
+                    );
                 }
             } else {
                 //gpt voted AGAINST
-                if (
-                    (againstVotes + calculateGPTVotingPower(_proposalId)) >
-                    forVotes
-                ) {
-                    proposalIdToShouldTransfer[_proposalId] = true;
-                    proposalIdToShouldTransferTo[_proposalId] = Parties
-                        .AgainstParty;
-                }
+                ProposalData memory data = proposalIdToData[_proposalId];
+                address[] memory targets = new address[](1);
+                targets[0] = data.targets[0];
+
+                uint256[] memory values = new uint256[](1);
+                values[0] = 0;
+
+                console.log("CASE 6");
+
+                bytes[] memory datas = new bytes[](1);
+                datas[0] = data.calldatas[1];
+
+                super._execute(_proposalId, targets, values, datas, "reason");
             }
         }
 
-        console.log("GPT VOTED", proposalIdToChatGPT[_proposalId]);
+        // console.log("Funds released");
 
         emit OCRResponse(requestId, response, err);
     }
 
     function getGPTIsVoted(uint256 _proposalId) public view returns (bool) {
         return proposalIdToChatGPTVoted[_proposalId];
+    }
+
+    function setFreelancoContract(address _freelancoContract) public onlyOwner {
+        freelancoContract = Freelanco(_freelancoContract);
     }
 
     function getShouldTransfer(uint256 _proposalId) public view returns (bool) {
@@ -279,12 +401,26 @@ contract GovernorContract is
         string memory description
     ) public override(Governor, IGovernor) returns (uint256) {
         counter++;
-        _counterToProposalId[counter] = hashProposal(
+        uint256 proposalId = hashProposal(
             targets,
             values,
             calldatas,
             keccak256(bytes(description))
         );
+        _counterToProposalId[counter] = proposalId;
+
+        proposalIdToShouldGPTVote[proposalId] = false;
+
+        bool shouldGPTVote = freelancoContract.isProposalDisputed(proposalId);
+
+        proposalIdToData[proposalId] = ProposalData(
+            block.number,
+            proposalId,
+            shouldGPTVote,
+            targets,
+            calldatas
+        );
+
         return super.propose(targets, values, calldatas, description);
     }
 
@@ -351,39 +487,40 @@ contract GovernorContract is
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
-        if (proposalIdToChatGPT[proposalId] == 1) {
-            // if chat gpt vote's for, as the DAO members also voted for, we execute
-            super._execute(
-                proposalId,
-                targets,
-                values,
-                calldatas,
-                descriptionHash
-            );
-        } else {
-            //if chat gpt doesn't vote for, then we need to re count
+        super._execute(proposalId, targets, values, calldatas, descriptionHash);
+        // if (proposalIdToChatGPT[proposalId] == 1) {
+        //     // if chat gpt vote's for, as the DAO members also voted for, we execute
+        //     super._execute(
+        //         proposalId,
+        //         targets,
+        //         values,
+        //         calldatas,
+        //         descriptionHash
+        //     );
+        // } else {
+        //     //if chat gpt doesn't vote for, then we need to re count
 
-            (
-                uint256 againstVotes,
-                uint256 forVotes,
-                uint256 abstainVotes
-            ) = proposalVotes(proposalId);
+        //     (
+        //         uint256 againstVotes,
+        //         uint256 forVotes,
+        //         uint256 abstainVotes
+        //     ) = proposalVotes(proposalId);
 
-            bool shouldExecute = forVotes >
-                againstVotes + calculateGPTVotingPower(proposalId);
+        //     bool shouldExecute = forVotes >
+        //         againstVotes + calculateGPTVotingPower(proposalId);
 
-            if (shouldExecute) {
-                super._execute(
-                    proposalId,
-                    targets,
-                    values,
-                    calldatas,
-                    descriptionHash
-                );
-            } else {
-                proposalIdToShouldTransfer[proposalId] = true;
-            }
-        }
+        //     if (shouldExecute) {
+        //         super._execute(
+        //             proposalId,
+        //             targets,
+        //             values,
+        //             calldatas,
+        //             descriptionHash
+        //         );
+        //     } else {
+        //         proposalIdToShouldTransfer[proposalId] = true;
+        //     }
+        // }
     }
 
     function calculateGPTVotingPower(

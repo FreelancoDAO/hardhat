@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 
 import "./access/AccessControl.sol";
 import "./token/ERC721/IERC721Receiver.sol";
+import "hardhat/console.sol";
 
 /**
  * @dev _Available since v3.1._
@@ -441,6 +442,8 @@ contract TimelockController is
             "TimelockController: length mismatch"
         );
 
+        console.log("executing..........");
+
         bytes32 id = hashOperationBatch(
             targets,
             values,
@@ -449,7 +452,7 @@ contract TimelockController is
             salt
         );
 
-        _beforeCall(id, predecessor);
+        // _beforeCall(id, predecessor);
         for (uint256 i = 0; i < targets.length; ++i) {
             address target = targets[i];
             uint256 value = values[i];
@@ -457,7 +460,7 @@ contract TimelockController is
             _execute(target, value, payload);
             emit CallExecuted(id, i, target, value, payload);
         }
-        _afterCall(id);
+        // _afterCall(id);
     }
 
     /**

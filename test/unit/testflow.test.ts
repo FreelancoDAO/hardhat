@@ -36,7 +36,7 @@ describe("Governor Flow", async () => {
   let freelanco: Freelanco;
   let daoNft: DaoNFT;
   let vrf: VRFCoordinatorV2Mock;
-  const voteWay = 0; // for
+  const voteWay = 1; // for
   const reason = "I lika do da cha cha";
   beforeEach(async () => {
     await deployments.fixture(["all"]);
@@ -126,6 +126,9 @@ describe("Governor Flow", async () => {
     console.log("Vote casted from account: ", freelancer.address);
     console.log("Simulating CHAT GPT");
 
+    const balance2ETH3 = await ethers.provider.getBalance(freelanco.address);
+    console.log("Balance: ", BigInt(balance2ETH3._hex));
+
     try {
       const taskArgs = {};
       const unvalidatedRequestConfig = require("/Users/shivamarora/Documents/Projects/freelanco-dao/deployment/hardhat/Functions-request-config.js");
@@ -201,39 +204,39 @@ describe("Governor Flow", async () => {
     await moveBlocks(VOTING_PERIOD + 1);
 
     // queue & execute
-    proposalState = await governor.state(proposalId);
-    console.log("STATE:", proposalState);
+    // proposalState = await governor.state(proposalId);
+    // console.log("STATE:", proposalState);
 
-    try {
-      console.log("Queing...");
-      const descriptionHash = ethers.utils.keccak256(
-        ethers.utils.toUtf8Bytes(PROPOSAL_DESCRIPTION)
-      );
-      // const descriptionHash = ethers.utils.id(PROPOSAL_DESCRIPTION)
-      const queueTx = await governor.queue(
-        targets,
-        [0],
-        calldata,
-        descriptionHash
-      );
-      await queueTx.wait(1);
-      await moveTime(MIN_DELAY + 2);
-      await moveBlocks(10);
+    // try {
+    //   console.log("Queing...");
+    //   const descriptionHash = ethers.utils.keccak256(
+    //     ethers.utils.toUtf8Bytes(PROPOSAL_DESCRIPTION)
+    //   );
+    //   // const descriptionHash = ethers.utils.id(PROPOSAL_DESCRIPTION)
+    //   const queueTx = await governor.queue(
+    //     targets,
+    //     [0, 0],
+    //     calldata,
+    //     descriptionHash
+    //   );
+    //   await queueTx.wait(1);
+    //   await moveTime(MIN_DELAY + 2);
+    //   await moveBlocks(10);
 
-      proposalState = await governor.state(proposalId);
-      console.log("STATE:", proposalState);
+    //   proposalState = await governor.state(proposalId);
+    //   console.log("STATE:", proposalState);
 
-      console.log("Executing...");
-      const exTx = await governor.execute(
-        targets,
-        [0],
-        calldata,
-        descriptionHash
-      );
-      await exTx.wait(1);
-    } catch (e) {
-      console.log("Queuening and Executing Failed", e);
-    }
+    //   console.log("Executing...");
+    //   const exTx = await governor.execute(
+    //     targets,
+    //     [0, 0],
+    //     calldata,
+    //     descriptionHash
+    //   );
+    //   await exTx.wait(1);
+    // } catch (e) {
+    //   console.log("Queuening and Executing Failed", e);
+    // }
 
     await moveBlocks(20);
     proposalState = await governor.state(proposalId);
@@ -242,7 +245,7 @@ describe("Governor Flow", async () => {
     const balance0ETH = await ethers.provider.getBalance(freelanco.address);
     console.log("Balance: ", BigInt(balance0ETH._hex));
 
-    await freelanco.connect(freelancer).getDisputedFunds(1);
+    // await freelanco.connect(freelancer).getDisputedFunds(1);
     // await moveBlocks(5);
 
     const balance2ETH = await ethers.provider.getBalance(freelanco.address);

@@ -45,10 +45,13 @@ contract Freelanco is Ownable {
         string description;
         uint256 offerID;
         address disputingParty;
+        address againstParty;
+        uint256 amountEscrowed;
     }
 
     mapping(uint256 => Dispute) public _counterToDispute;
     mapping(address => Freelancer) public _freelancers;
+    mapping(uint256 => Dispute) public proposalIdToDispute;
 
     event OfferSent(
         uint256 _offerId,
@@ -253,7 +256,7 @@ contract Freelanco is Ownable {
         Offer offerContract = Offer(offers[_offerId]);
         Offer.Proposal memory offerDetails = offerContract.getDetails();
 
-        bytes[] memory datas = new bytes[](1);
+        bytes[] memory datas = new bytes[](2);
 
         if (msg.sender == offerDetails._client) {
             offerContract.disputeByClient();
@@ -262,6 +265,12 @@ contract Freelanco is Ownable {
                 "handleDispute(uint256,address)",
                 _offerId,
                 offerDetails._client
+            );
+
+            datas[1] = abi.encodeWithSignature(
+                "handleDispute(uint256,address)",
+                _offerId,
+                offerDetails._freelancerAddress
             );
 
             emit OfferStatusUpdated(
@@ -277,6 +286,12 @@ contract Freelanco is Ownable {
                 offerDetails._freelancerAddress
             );
 
+            datas[1] = abi.encodeWithSignature(
+                "handleDispute(uint256,address)",
+                _offerId,
+                offerDetails._client
+            );
+
             emit OfferStatusUpdated(
                 _offerId,
                 Offer.ProposalStatus.Over_By_Freelancer
@@ -285,13 +300,11 @@ contract Freelanco is Ownable {
             revert Freelanco__ClientNeedsToEscrow();
         }
 
-        uint256[] memory values = new uint256[](1);
+        uint256[] memory values = new uint256[](2);
         values[0] = 0;
 
-        address[] memory targets = new address[](1);
+        address[] memory targets = new address[](2);
         targets[0] = address(this);
-
-        governor.propose(targets, values, datas, _reason);
 
         uint256 proposalId = governor.hashProposal(
             targets,
@@ -301,6 +314,7 @@ contract Freelanco is Ownable {
         );
 
         _disputeCounter++;
+
         _counterToDispute[_disputeCounter] = Dispute(
             proposalId,
             targets,
@@ -308,130 +322,16 @@ contract Freelanco is Ownable {
             datas,
             _reason,
             _offerId,
-            msg.sender
+            msg.sender,
+            offerDetails._freelancerAddress,
+            offerDetails._amountEscrowed
         );
+
+        proposalIdToDispute[proposalId] = _counterToDispute[_disputeCounter];
+
+        governor.propose(targets, values, datas, _reason);
 
         emit ContractDisputed(_offerId, proposalId, _reason);
-    }
-
-    function getDisputedFunds(uint256 _disputeCounterArg) public {
-        console.log(
-            "proposal id:",
-            _counterToDispute[_disputeCounterArg].proposalId
-        );
-        Dispute storage dispute = _counterToDispute[_disputeCounterArg];
-
-        Offer offerContract = Offer(offers[dispute.offerID]);
-        Offer.Proposal memory offerDetails = offerContract.getDetails();
-
-        if (governor.getGPTIsVoted(dispute.proposalId)) {
-            if (uint256(governor.state(dispute.proposalId)) == 7) {
-                // this means majory voted for and if gpt voted against,
-                //it was still executed but money is still needs to be transfered
-                if (governor.getShouldTransfer(dispute.proposalId)) {
-                    console.log(
-                        "proposal state",
-                        uint256(governor.state(dispute.proposalId))
-                    );
-                    console.log("disputed by:", dispute.disputingParty);
-                    console.log("frealancer", offerDetails._freelancerAddress);
-                    console.log("client:", offerDetails._client);
-
-                    //since disputed party did not win the proposal in that case
-
-                    address receiver;
-                    if (
-                        offerDetails._freelancerAddress ==
-                        dispute.disputingParty
-                    ) {
-                        receiver = offerDetails._client;
-                    } else {
-                        receiver = offerDetails._freelancerAddress;
-                    }
-
-                    console.log("receiver:", receiver);
-                    console.log("amount:", offerDetails._amountEscrowed);
-
-                    //if executed before, gpt would say send money to disclosing party
-
-                    if (
-                        uint256(
-                            governor.getShouldTransferTo(dispute.proposalId)
-                        ) == 1
-                    ) {
-                        (bool sent, ) = receiver.call{
-                            value: offerDetails._amountEscrowed
-                        }("");
-                        if (sent != true) {
-                            revert TransactionFailed();
-                        }
-
-                        console.log("tx sent");
-
-                        offerContract.disputeResolved();
-
-                        emit OfferStatusUpdated(
-                            dispute.offerID,
-                            Offer.ProposalStatus.Dispute_Over
-                        );
-                    } else {
-                        console.log(
-                            "Money already transferd to disputing party"
-                        );
-                    }
-                }
-
-                // console.log(offerDetails);
-            } else if (uint256(governor.state(dispute.proposalId)) == 3) {
-                if (governor.getShouldTransfer(dispute.proposalId)) {
-                    address receiver;
-                    if (
-                        uint256(
-                            governor.getShouldTransferTo(dispute.proposalId)
-                        ) == 0
-                    ) {
-                        //transfer to disputing party
-                        if (
-                            offerDetails._freelancerAddress ==
-                            dispute.disputingParty
-                        ) {
-                            receiver = offerDetails._freelancerAddress;
-                        } else {
-                            receiver = offerDetails._client;
-                        }
-                    } else {
-                        //transfer to against party
-                        if (
-                            offerDetails._freelancerAddress ==
-                            dispute.disputingParty
-                        ) {
-                            receiver = offerDetails._client;
-                        } else {
-                            receiver = offerDetails._freelancerAddress;
-                        }
-                    }
-
-                    (bool sent, ) = receiver.call{
-                        value: offerDetails._amountEscrowed
-                    }("");
-                    if (sent != true) {
-                        revert TransactionFailed();
-                    }
-
-                    console.log("disputing party:", dispute.disputingParty);
-                    console.log("frealancer", offerDetails._freelancerAddress);
-                    console.log("client:", offerDetails._client);
-                    console.log("tx sent to", receiver);
-
-                    offerContract.disputeResolved();
-
-                    emit OfferStatusUpdated(
-                        dispute.offerID,
-                        Offer.ProposalStatus.Dispute_Over
-                    );
-                }
-            }
-        }
     }
 
     function withdraw() public onlyOwner {
@@ -489,6 +389,8 @@ contract Freelanco is Ownable {
         uint256 _offerId,
         address receiver
     ) public onlyOwner {
+        console.log("handle dispute called");
+
         Offer offerContract = Offer(offers[_offerId]);
         Offer.Proposal memory offerDetails = offerContract.getDetails();
 
@@ -558,6 +460,27 @@ contract Freelanco is Ownable {
     //VIEW
     function getOfferContract(uint256 _offerId) public view returns (address) {
         return address(offers[_offerId]);
+    }
+
+    function getDisputeStruct(
+        uint256 _proposalID
+    ) public view returns (Dispute memory) {
+        Dispute memory dispute = proposalIdToDispute[_proposalID];
+        return dispute;
+    }
+
+    function isProposalDisputed(
+        uint256 _proposalID
+    ) public view returns (bool) {
+        Dispute memory dispute = proposalIdToDispute[_proposalID];
+
+        console.log("arg", _proposalID);
+        console.log("pro:", dispute.proposalId);
+        if (dispute.proposalId != 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     function getOfferId(uint256 _counterIdx) public view returns (uint256) {
