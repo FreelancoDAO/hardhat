@@ -32,7 +32,6 @@ contract GovernorContract is
     GovernorVotes,
     GovernorVotesQuorumFraction,
     GovernorTimelockControl,
-    AutomationCompatibleInterface,
     FunctionsClient,
     ConfirmedOwner
 {
@@ -63,7 +62,7 @@ contract GovernorContract is
 
     //State
     uint256 public counter = 0;
-    uint256 public immutable amountToMintPerProposal = 100 ether;
+    uint256 public immutable amountToMintPerProposal = 10 ether;
 
     mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
     mapping(uint256 => uint256) public _counterToProposalId; //minting reputation tokens
@@ -421,44 +420,6 @@ contract GovernorContract is
         returns (uint256)
     {
         return super.proposalThreshold();
-    }
-
-    function checkUpkeep(
-        bytes calldata /* checkData */
-    )
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory /* performData */)
-    {
-        for (uint256 i = 0; i < counter; i++) {
-            uint256 proposalId = _counterToProposalId[i];
-            if (isProposalReputed(proposalId)) {
-                upkeepNeeded = true;
-            }
-        }
-        upkeepNeeded = false;
-    }
-
-    function performUpkeep(bytes calldata /* performData */) external override {
-        for (uint256 i = 1; i <= counter; i++) {
-            uint256 proposalId = _counterToProposalId[i];
-            if (isProposalReputed(proposalId)) {
-                VoterDetails[] memory voters_ = voters[proposalId];
-                uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
-                address[] memory reputedVoters = new address[](voters_.length);
-
-                for (uint256 j = 0; j < voters_.length; j++) {
-                    VoterDetails memory voter = voters_[j];
-                    if (result == voter.support) {
-                        reputedVoters[j] = voter.account;
-                        console.log("repited", voter.account);
-                    }
-                }
-
-                _mintReputationTokens(reputedVoters, proposalId);
-            }
-        }
     }
 
     function isProposalReputed(uint256 _proposalId) public view returns (bool) {

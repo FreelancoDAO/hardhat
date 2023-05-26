@@ -34,6 +34,7 @@ contract Freelanco is Ownable {
         address disputingParty;
         address againstParty;
         uint256 amountEscrowed;
+        bool isDisputeOver;
     }
 
     //DAO Contracts
@@ -90,6 +91,12 @@ contract Freelanco is Ownable {
     );
 
     event GrantInitiated(uint indexed _proposalId, string _reason, bytes data);
+
+    event SlashedFreelancerFunds(
+        uint _offerId,
+        address freelancer,
+        uint amount
+    );
 
     constructor(
         GovernorContract _governorContract,
@@ -220,7 +227,7 @@ contract Freelanco is Ownable {
         }
 
         if (msg.sender != offerDetails._client) {
-            revert Freelanco__OnlyFreelancerCanDoThisAction();
+            revert Freelanco__OnlyClientCanDoThisAction();
         }
 
         if (extend) {
@@ -326,12 +333,15 @@ contract Freelanco is Ownable {
             _offerId,
             msg.sender,
             offerDetails._freelancerAddress,
-            offerDetails._amountEscrowed
+            offerDetails._amountEscrowed,
+            false
         );
 
         proposalIdToDispute[proposalId] = _counterToDispute[_disputeCounter];
 
         governor.propose(targets, values, datas, _reason);
+
+        offerContract.setProposalId(proposalId);
 
         emit ContractDisputed(_offerId, proposalId, _reason);
     }
@@ -441,6 +451,7 @@ contract Freelanco is Ownable {
         address receiver
     ) public onlyOwner {
         Offer offerContract = Offer(offers[_offerId]);
+        console.log("offercontract", address(offerContract));
         Offer.Proposal memory offerDetails = offerContract.getDetails();
 
         if (
@@ -453,11 +464,54 @@ contract Freelanco is Ownable {
             if (sent != true) {
                 revert TransactionFailed();
             }
+
+            console.log("dispute handled");
+            uint256 _proposalid = offerContract.getProposalId();
+
+            Dispute memory dispute = proposalIdToDispute[_proposalid];
+            dispute.isDisputeOver = true;
+
+            console.log("isdisputeover", dispute.isDisputeOver, _proposalid);
+
+            offerContract.disputeResolved();
+
+            console.log("balance: ", address(this).balance);
+
+            //slash freelancers money if deposited for boosting
+            if (offerDetails._client == receiver) {
+                uint256 bps = 1000; // 10%
+                uint256 _10percent = calculatePercentage(
+                    offerDetails._amountEscrowed,
+                    bps
+                );
+
+                if (
+                    _freelancers[offerDetails._freelancerAddress]
+                        ._lockedAmount >= _10percent
+                ) {
+                    _freelancers[offerDetails._freelancerAddress]
+                        ._lockedAmount -= _10percent;
+                } else if (
+                    _freelancers[offerDetails._freelancerAddress]
+                        ._lockedAmount >=
+                    0 &&
+                    _freelancers[offerDetails._freelancerAddress]
+                        ._lockedAmount <=
+                    _10percent
+                ) {
+                    _freelancers[offerDetails._freelancerAddress]
+                        ._lockedAmount = 0;
+                }
+
+                emit SlashedFreelancerFunds(
+                    _offerId,
+                    offerDetails._freelancerAddress,
+                    _10percent
+                );
+            }
         } else {
             revert TransactionFailed();
         }
-
-        offerContract.disputeResolved();
 
         emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Dispute_Over);
     }
@@ -480,15 +534,41 @@ contract Freelanco is Ownable {
         if (_freelancers[msg.sender]._lockedAmount == 0) {
             revert TransactionFailed();
         }
-        if (_freelancers[msg.sender]._deadlineBlocks < block.number) {
+        if (_freelancers[msg.sender]._deadlineBlocks > block.number) {
             revert TransactionFailed();
         }
+
+        // for (uint256 i = 0; i < _counter; i++) {
+        //     Dispute memory d = _counterToDispute[_counter];
+        //     if (
+        //         d.againstParty == msg.sender || d.disputingParty == msg.sender
+        //     ) {
+        //         console.log("bool of status:", d.isDisputeOver);
+        //         console.log("props:", d.proposalId);
+
+        //         if (d.isDisputeOver) {
+        //             console.log("send money");
+        //         }
+
+        //         // if (o.getOfferStatus() != Offer.ProposalStatus.Dispute_Over) {
+        //         //     revert TransactionFailed();
+        //         // }
+        //     }
+        // }
+
         (bool sent, ) = msg.sender.call{
             value: _freelancers[msg.sender]._lockedAmount
         }("");
+
+        _freelancers[msg.sender]._lockedAmount = 0;
         if (sent != true) {
             revert TransactionFailed();
         }
+
+        console.log(
+            "withdrew balance:",
+            _freelancers[msg.sender]._lockedAmount
+        );
 
         emit FreelancerWithrewLockedFunds(
             msg.sender,

@@ -60,6 +60,10 @@ describe("Governor Flow", async () => {
     const [freelancer, client] = await ethers.getSigners();
     // console.log("Freelancer: ", freelancer)
 
+    await freelanco.connect(freelancer).boostProfile(10, {
+      value: ethers.utils.parseEther("10"),
+    });
+
     await freelanco
       .connect(client)
       .sendOffer(0, freelancer.address, "Terms are to dispute it", 100, {
@@ -202,6 +206,8 @@ describe("Governor Flow", async () => {
     // assert.equal(proposalState.toString(), "1");
 
     await moveBlocks(VOTING_PERIOD + 1);
+
+    await freelanco.connect(freelancer).withdrawLockedFreelancerAmount();
 
     // queue & execute
     // proposalState = await governor.state(proposalId);

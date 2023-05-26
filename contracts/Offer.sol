@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import "hardhat/console.sol";
+
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -32,6 +34,8 @@ contract Offer is Ownable {
     }
 
     Proposal private offer;
+
+    uint256 public _proposalId;
 
     constructor(
         uint256 _gigId,
@@ -103,6 +107,19 @@ contract Offer is Ownable {
     function disputeResolved() public onlyOwner {
         Proposal storage proposal = offer;
         proposal._status = ProposalStatus.Dispute_Over;
+
+        console.log(
+            "proosal changed to dispute Over",
+            uint256(proposal._status)
+        );
+    }
+
+    function setProposalId(uint256 _id) public {
+        _proposalId = _id;
+    }
+
+    function getProposalId() public view returns (uint256) {
+        return _proposalId;
     }
 
     function getDetails() public view returns (Proposal memory) {
