@@ -442,8 +442,6 @@ contract TimelockController is
             "TimelockController: length mismatch"
         );
 
-        console.log("executing..........");
-
         bytes32 id = hashOperationBatch(
             targets,
             values,
@@ -452,7 +450,7 @@ contract TimelockController is
             salt
         );
 
-        // _beforeCall(id, predecessor);
+        // _beforeCall(id, predecessor); // add custom logic for re-antrancy attack
         for (uint256 i = 0; i < targets.length; ++i) {
             address target = targets[i];
             uint256 value = values[i];

@@ -18,19 +18,6 @@ error Freelanco__OnlyClientCanDoThisAction();
 contract Freelanco is Ownable {
     using SafeMath for uint256;
 
-    mapping(uint256 => Offer) public offers;
-    mapping(uint256 => uint256) public _counterToOffers;
-
-    uint256 public _counter;
-    uint256 public _disputeCounter;
-    GovernorContract governor;
-    Gig _nft_contract;
-    DAOReputationToken _reputation_contract;
-    uint256 private _daoChargesPercentage = 20;
-    uint8 constant SOLDIER_SHARE = 30;
-    uint8 constant MARINE_SHARE = 30;
-    uint8 constant CAPTAIN_SHARE = 40;
-
     struct Freelancer {
         address _owner;
         uint256 _lockedAmount;
@@ -48,6 +35,22 @@ contract Freelanco is Ownable {
         address againstParty;
         uint256 amountEscrowed;
     }
+
+    //DAO Contracts
+    GovernorContract governor;
+    Gig _nft_contract;
+    DAOReputationToken _reputation_contract;
+
+    mapping(uint256 => Offer) public offers;
+    mapping(uint256 => uint256) public _counterToOffers;
+
+    uint256 public _counter;
+    uint256 public _disputeCounter;
+    uint256 private _daoChargesPercentage = 20;
+
+    uint8 constant SOLDIER_SHARE = 30;
+    uint8 constant MARINE_SHARE = 30;
+    uint8 constant CAPTAIN_SHARE = 40;
 
     mapping(uint256 => Dispute) public _counterToDispute;
     mapping(address => Freelancer) public _freelancers;
@@ -86,6 +89,8 @@ contract Freelanco is Ownable {
         uint _amount
     );
 
+    event GrantInitiated(uint indexed _proposalId, string _reason, bytes data);
+
     constructor(
         GovernorContract _governorContract,
         Gig _nftContractAddress,
@@ -121,11 +126,14 @@ contract Freelanco is Ownable {
 
         uint256 _daoFees = msg.value - _escrowedAmount;
 
+        console.log("dao fees", _daoFees);
+        console.log("escrowed:", _escrowedAmount);
+
         offers[_offerId] = new Offer(
             _gigTokenId,
             _freelancer,
             msg.sender,
-            msg.value,
+            _escrowedAmount,
             _daoFees,
             _terms,
             _deadline
@@ -224,12 +232,6 @@ contract Freelanco is Ownable {
             if (sent != true) {
                 revert TransactionFailed();
             }
-            console.log(
-                "Sent ",
-                offerDetails._amountEscrowed,
-                "To ",
-                offerDetails._client
-            );
         }
     }
 
@@ -334,19 +336,67 @@ contract Freelanco is Ownable {
         emit ContractDisputed(_offerId, proposalId, _reason);
     }
 
+    function initiateGrantProposal(string memory _reason) public {
+        bytes[] memory datas = new bytes[](1);
+
+        datas[0] = abi.encodeWithSignature("withdraw()");
+
+        uint256[] memory values = new uint256[](1);
+        values[0] = 0;
+
+        address[] memory targets = new address[](1);
+        targets[0] = address(this);
+
+        governor.propose(targets, values, datas, _reason);
+
+        uint256 proposalId = governor.hashProposal(
+            targets,
+            values,
+            datas,
+            keccak256(bytes(_reason))
+        );
+
+        emit GrantInitiated(
+            proposalId,
+            _reason,
+            abi.encodeWithSignature("withdraw()")
+        );
+
+        console.log("grant made");
+    }
+
     function withdraw() public onlyOwner {
         // Get the current balance of the Freelanco contract
+
+        console.log("withdrawing..");
+
+        console.log("balance:", address(this).balance);
+
         uint256 balance = address(this).balance;
-        require(balance > 0, "Freelanco: contract has no funds to distribute");
+        if (balance < 0) {
+            console.log("balance low");
+            revert TransactionFailed();
+        }
 
         // Calculate the total number of NFT holders in each level
         uint256 totalSoldiers = 0;
         uint256 totalMarines = 0;
         uint256 totalCaptains = 0;
+
+        console.log("getting holders");
         address[] memory holders = _reputation_contract.getHolders();
+
+        console.log("got holders", uint256(holders.length));
+        if (uint256(holders.length) <= 0) {
+            console.log("reverting...");
+            revert TransactionFailed();
+        }
+
         for (uint256 i = 0; i < holders.length; i++) {
             address holder = holders[i];
             uint8 level = _reputation_contract.getRepo(holder);
+
+            console.log("counting");
             if (level == 1) {
                 totalSoldiers++;
             } else if (level == 2) {
@@ -379,6 +429,7 @@ contract Freelanco is Ownable {
             } else if (level == 3) {
                 amount = captainsShare;
             }
+            console.log("distributing");
             if (amount > 0) {
                 payable(holder).transfer(amount); //change this
             }
@@ -389,8 +440,6 @@ contract Freelanco is Ownable {
         uint256 _offerId,
         address receiver
     ) public onlyOwner {
-        console.log("handle dispute called");
-
         Offer offerContract = Offer(offers[_offerId]);
         Offer.Proposal memory offerDetails = offerContract.getDetails();
 
@@ -474,8 +523,6 @@ contract Freelanco is Ownable {
     ) public view returns (bool) {
         Dispute memory dispute = proposalIdToDispute[_proposalID];
 
-        console.log("arg", _proposalID);
-        console.log("pro:", dispute.proposalId);
         if (dispute.proposalId != 0) {
             return true;
         } else {

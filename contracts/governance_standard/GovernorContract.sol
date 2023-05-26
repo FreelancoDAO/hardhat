@@ -39,12 +39,6 @@ contract GovernorContract is
     //Chainlink Functoins
     using Functions for Functions.Request;
 
-    bytes32 public latestRequestId;
-    bytes public latestResponse;
-    bytes public latestError;
-
-    event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
-
     struct VoterDetails {
         address account;
         uint256 support;
@@ -57,26 +51,30 @@ contract GovernorContract is
         bytes[] calldatas;
     }
 
-    uint256 public counter = 0;
+    //Chainlink variables
+    bytes32 public latestRequestId;
+    bytes public latestResponse;
+    bytes public latestError;
+
+    //DAO contracts
     DAOReputationToken public reputationContract;
     DaoNFT public daoNFTContract;
     Freelanco public freelancoContract;
 
-    mapping(uint256 => VoterDetails[]) public voters;
-    mapping(uint256 => uint256) public _counterToProposalId;
-    mapping(bytes32 => uint256) public requestIdToProposalId;
-    mapping(uint256 => uint8) public proposalIdToChatGPT;
-    mapping(uint256 => bool) public proposalIdToChatGPTVoted;
-    mapping(uint256 => bool) public proposalIdToShouldTransfer;
-    mapping(uint256 => Parties) public proposalIdToShouldTransferTo;
-    mapping(uint256 => bool) public proposalIdToShouldGPTVote;
-    mapping(uint256 => ProposalData) public proposalIdToData;
+    //State
+    uint256 public counter = 0;
     uint256 public immutable amountToMintPerProposal = 100 ether;
 
-    enum Parties {
-        DisputingParty,
-        AgainstParty
-    }
+    mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
+    mapping(uint256 => uint256) public _counterToProposalId; //minting reputation tokens
+    mapping(bytes32 => uint256) public requestIdToProposalId; //chainlink fulflill request id
+    mapping(uint256 => uint8) public proposalIdToChatGPT; //stores the vote of GPT
+    mapping(uint256 => bool) public proposalIdToChatGPTVoted; //true when gpt votes after voting period
+    mapping(uint256 => bool) public proposalIdToShouldGPTVote; //true when proposal id matches a dispute in Freelanco Contract
+    mapping(uint256 => ProposalData) public proposalIdToData; //stores the information about the proposal if GPT needs to execute
+
+    //Events
+    event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
 
     constructor(
         IVotes _token,
@@ -106,6 +104,10 @@ contract GovernorContract is
 
     function updateOracleAddress(address oracle) public onlyOwner {
         setOracle(oracle);
+    }
+
+    function setFreelancoContract(address _freelancoContract) public onlyOwner {
+        freelancoContract = Freelanco(_freelancoContract);
     }
 
     function executeRequest(
@@ -185,10 +187,6 @@ contract GovernorContract is
                 datas[0] = data.calldatas[0];
 
                 super._execute(_proposalId, targets, values, datas, "reason");
-
-                // if (success != true) {
-                //     revert TransactionFailed();
-                // }
             } else {
                 //gpt voted AGAINST
                 if (
@@ -306,27 +304,21 @@ contract GovernorContract is
             }
         }
 
-        // console.log("Funds released");
+        VoterDetails[] memory voters_ = voters[_proposalId];
+
+        address[] memory reputedVoters = new address[](voters_.length);
+
+        for (uint256 j = 0; j < voters_.length; j++) {
+            VoterDetails memory voter = voters_[j];
+            if (result == voter.support) {
+                reputedVoters[j] = voter.account;
+                console.log("reputed", voter.account);
+            }
+        }
+
+        _mintReputationTokens(reputedVoters, _proposalId);
 
         emit OCRResponse(requestId, response, err);
-    }
-
-    function getGPTIsVoted(uint256 _proposalId) public view returns (bool) {
-        return proposalIdToChatGPTVoted[_proposalId];
-    }
-
-    function setFreelancoContract(address _freelancoContract) public onlyOwner {
-        freelancoContract = Freelanco(_freelancoContract);
-    }
-
-    function getShouldTransfer(uint256 _proposalId) public view returns (bool) {
-        return proposalIdToShouldTransfer[_proposalId];
-    }
-
-    function getShouldTransferTo(
-        uint256 _proposalId
-    ) public view returns (Parties) {
-        return proposalIdToShouldTransferTo[_proposalId];
     }
 
     function _castVote(
@@ -337,11 +329,9 @@ contract GovernorContract is
         bytes memory params
     ) internal override returns (uint256) {
         voters[proposalId].push(VoterDetails(account, support));
-
         if (daoNFTContract.balanceOf(account) <= 0) {
             revert isNotDaoMember();
         }
-
         return super._castVote(proposalId, account, support, reason, params);
     }
 
@@ -451,7 +441,7 @@ contract GovernorContract is
     }
 
     function performUpkeep(bytes calldata /* performData */) external override {
-        for (uint256 i = 0; i < counter; i++) {
+        for (uint256 i = 1; i <= counter; i++) {
             uint256 proposalId = _counterToProposalId[i];
             if (isProposalReputed(proposalId)) {
                 VoterDetails[] memory voters_ = voters[proposalId];
@@ -462,6 +452,7 @@ contract GovernorContract is
                     VoterDetails memory voter = voters_[j];
                     if (result == voter.support) {
                         reputedVoters[j] = voter.account;
+                        console.log("repited", voter.account);
                     }
                 }
 
@@ -471,6 +462,7 @@ contract GovernorContract is
     }
 
     function isProposalReputed(uint256 _proposalId) public view returns (bool) {
+        console.log("PROPOSAL STATE:", uint256(state(_proposalId)));
         if (
             state(_proposalId) == ProposalState.Defeated ||
             state(_proposalId) == ProposalState.Succeeded
@@ -488,44 +480,11 @@ contract GovernorContract is
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
         super._execute(proposalId, targets, values, calldatas, descriptionHash);
-        // if (proposalIdToChatGPT[proposalId] == 1) {
-        //     // if chat gpt vote's for, as the DAO members also voted for, we execute
-        //     super._execute(
-        //         proposalId,
-        //         targets,
-        //         values,
-        //         calldatas,
-        //         descriptionHash
-        //     );
-        // } else {
-        //     //if chat gpt doesn't vote for, then we need to re count
-
-        //     (
-        //         uint256 againstVotes,
-        //         uint256 forVotes,
-        //         uint256 abstainVotes
-        //     ) = proposalVotes(proposalId);
-
-        //     bool shouldExecute = forVotes >
-        //         againstVotes + calculateGPTVotingPower(proposalId);
-
-        //     if (shouldExecute) {
-        //         super._execute(
-        //             proposalId,
-        //             targets,
-        //             values,
-        //             calldatas,
-        //             descriptionHash
-        //         );
-        //     } else {
-        //         proposalIdToShouldTransfer[proposalId] = true;
-        //     }
-        // }
     }
 
     function calculateGPTVotingPower(
         uint256 _proposalId
-    ) public returns (uint256) {
+    ) public view returns (uint256) {
         (
             uint256 againstVotes,
             uint256 forVotes,

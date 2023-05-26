@@ -56,14 +56,14 @@ describe("Governor Flow", async () => {
     ).to.be.revertedWith("Ownable: caller is not the owner");
   });
 
-  it("sends offer, approves offer, then disputes i.e proposes, votes, waits, queues, and then executes", async () => {
+  it("sends offer, approves offer, then disputes i.e proposes, votes, waits, queues, and simulate GPTs vote to execute", async () => {
     const [freelancer, client] = await ethers.getSigners();
     // console.log("Freelancer: ", freelancer)
 
     await freelanco
       .connect(client)
       .sendOffer(0, freelancer.address, "Terms are to dispute it", 100, {
-        value: ethers.utils.parseEther("200"),
+        value: ethers.utils.parseEther("10"),
       });
 
     const offerId = await freelanco.getOfferId(1);
@@ -245,10 +245,81 @@ describe("Governor Flow", async () => {
     const balance0ETH = await ethers.provider.getBalance(freelanco.address);
     console.log("Balance: ", BigInt(balance0ETH._hex));
 
-    // await freelanco.connect(freelancer).getDisputedFunds(1);
-    // await moveBlocks(5);
+    const [deployer, member] = await ethers.getSigners();
 
-    const balance2ETH = await ethers.provider.getBalance(freelanco.address);
-    console.log("Balance: ", BigInt(balance2ETH._hex));
+    const txRsponse2 = await freelanco
+      .connect(member)
+      .initiateGrantProposal("reason");
+
+    const transactionReceipt2 = await txRsponse2.wait();
+
+    console.log(transactionReceipt2.events[1].args.data);
+
+    // console.log(transactionReceipt.events[1])
+    const proposalId2 = transactionReceipt2.events[1].args._proposalId;
+    // const proposalId = 0;
+
+    // const proposeReceipt = await proposeTx.wait(1)
+    // const proposalId = proposeReceipt.events![0].args!.proposalId
+    let proposalState2 = await governor.state(proposalId2);
+
+    await moveBlocks(VOTING_DELAY + 2);
+    // vote
+    console.log("Voting..");
+    const daoNft2 = await ethers.getContract("DaoNFT");
+
+    const voteTx2 = await governor.castVoteWithReason(
+      proposalId2,
+      voteWay,
+      reason
+    );
+    await voteTx.wait(1);
+
+    await moveBlocks(10);
+
+    // queue & execute
+    proposalState = await governor.state(proposalId2);
+    console.log("STATE:", proposalState);
+
+    try {
+      console.log("Queing...");
+      const descriptionHash = ethers.utils.keccak256(
+        ethers.utils.toUtf8Bytes("reason")
+      );
+      // const descriptionHash = ethers.utils.id(PROPOSAL_DESCRIPTION)
+      const queueTx = await governor.queue(
+        [freelanco.address],
+        [0],
+        [transactionReceipt2.events[1].args.data],
+        descriptionHash
+      );
+      await queueTx.wait(1);
+      await moveTime(MIN_DELAY + 2);
+      await moveBlocks(10);
+
+      proposalState = await governor.state(proposalId);
+      console.log("STATE:", proposalState);
+
+      console.log("Executing...");
+      const exTx = await governor.execute(
+        [freelanco.address],
+        [0],
+        [transactionReceipt2.events[1].args.data],
+        descriptionHash
+      );
+      await exTx.wait(1);
+    } catch (e) {
+      console.log("Queuening and Executing Failed", e);
+    }
   });
 });
+
+/*
+console.log("Minting reputation tokens");
+    // await network.provider.send("evm_increaseTime", [1000]);
+    // await network.provider.request({ method: "evm_mine", params: [] });
+    governor.performUpkeep("0x");
+
+    console.log("making a grant proposal and executing");
+    freelanco.initiateGrantProposal("this is a reason");
+*/
