@@ -91,7 +91,7 @@ const deployGovernorContract: DeployFunction = async function (
     ]);
     await oracleProxy.setRegistry(registryProxy.address);
 
-    console.log("oracle deployed");
+    console.log("oracle deployed at", oracleProxy.address);
 
     return { oracle: oracleProxy, registry: registryProxy, linkToken };
   };

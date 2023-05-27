@@ -1,9 +1,9 @@
-const prompt = args[0];
-const proposalId = args[1];
+// const prompt = args[0];
+// const proposalId = args[1];
 
-console.log("hash prompt:", prompt);
+// console.log("hash prompt:", prompt);
 
-console.log("proposalId:", proposalId);
+// console.log("proposalId:", proposalId);
 
 // if (!secrets.openaiKey) {
 //   throw Error("Need to set OPENAI_KEY environment variable");

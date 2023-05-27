@@ -8,6 +8,7 @@ import {
   DaoNFT,
   VRFConsumerBaseV2,
   VRFCoordinatorV2Mock,
+  DAOReputationToken,
 } from "../../typechain-types";
 import { deployments, ethers, network } from "hardhat";
 import { assert, expect } from "chai";
@@ -36,6 +37,7 @@ describe("Governor Flow", async () => {
   let freelanco: Freelanco;
   let daoNft: DaoNFT;
   let vrf: VRFCoordinatorV2Mock;
+  let daorepo: DAOReputationToken;
   const voteWay = 1; // for
   const reason = "I lika do da cha cha";
   beforeEach(async () => {
@@ -45,6 +47,7 @@ describe("Governor Flow", async () => {
     governanceToken = await ethers.getContract("GovernanceToken");
     freelanco = await ethers.getContract("Freelanco");
     vrf = await ethers.getContract("VRFCoordinatorV2Mock");
+    daorepo = await ethers.getContract("DAOReputationToken");
 
     // daoNft = await ethers.getContract("DaoNFT")
   });
@@ -63,6 +66,8 @@ describe("Governor Flow", async () => {
     await freelanco.connect(freelancer).boostProfile(10, {
       value: ethers.utils.parseEther("10"),
     });
+
+    // await daorepo.mint(freelancer.address, ethers.utils.parseEther("1"));
 
     await freelanco
       .connect(client)
@@ -207,7 +212,7 @@ describe("Governor Flow", async () => {
 
     await moveBlocks(VOTING_PERIOD + 1);
 
-    await freelanco.connect(freelancer).withdrawLockedFreelancerAmount();
+    await governor.connect(client).performUpkeep("0x");
 
     // queue & execute
     // proposalState = await governor.state(proposalId);
@@ -282,6 +287,20 @@ describe("Governor Flow", async () => {
     await voteTx.wait(1);
 
     await moveBlocks(10);
+
+    console.log(
+      "balance of freelancer: ",
+      Number((await freelancer.getBalance())._hex)
+    );
+
+    const balanceBefore = await Number((await freelancer.getBalance())._hex);
+
+    await freelanco.connect(freelancer).withdrawLockedFreelancerAmount();
+
+    console.log(
+      "balance changeD: ",
+      (await Number((await freelancer.getBalance())._hex)) > balanceBefore
+    );
 
     // queue & execute
     proposalState = await governor.state(proposalId2);

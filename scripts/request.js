@@ -2,7 +2,7 @@ const ethcrypto = require("eth-crypto");
 const axios = require("axios");
 const fs = require("fs").promises;
 
-async function main() {
+async function main(prompt, proposalId) {
   // Provider config currently set for Polygon Mumbai
 
   const provider = new ethers.providers.JsonRpcProvider(
@@ -14,9 +14,9 @@ async function main() {
   const signer = new ethers.Wallet(signerPrivateKey, provider);
 
   // Consumer contract
-  const consumerAddress = "your_consumer_address"; //governor contract
+  const consumerAddress = "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"; //governor contract
   const consumerAbiPath =
-    "./artifacts/contracts/GovernorContract.sol/GovernorContract.json";
+    "/Users/shivamarora/Documents/Projects/freelanco-dao/deployment/hardhat/artifacts/contracts/governance_standard/GovernorContract.sol/GovernorContract.json";
 
   const contractAbi = JSON.parse(
     await fs.readFile(consumerAbiPath, "utf8")
@@ -29,17 +29,17 @@ async function main() {
 
   // Transaction config
   const gasLimit = 250000; // Transaction gas limit
-  const verificationBlocks = 2; // Number of blocks to wait for transaction
+  const verificationBlocks = 1; // Number of blocks to wait for transaction
 
   // Chainlink Functions request config
   // Chainlink Functions subscription ID
-  const subscriptionId = "your_subscription_id"; //make a sub
+  const subscriptionId = "1"; //make a sub
   // Gas limit for the Chainlink Functions request
   const requestGas = 5500000;
 
   // Default example
-  const source = await fs.readFile("./Functions-request-source.js", "utf8");
-  const args = ["prompt"];
+  const source = await fs.readFile("./API-request-example.js", "utf8");
+  const args = [prompt, proposalId];
 
   // Tutorial 6
   // const source = await fs.readFile(
@@ -61,9 +61,9 @@ async function main() {
 
   // Create an oracle contract object.
   // Used in this script only to encrypt secrets.
-  const oracleAddress = "0xeA6721aC65BCeD841B8ec3fc5fEdeA6141a0aDE4"; // Polygon Mumbai
+  const oracleAddress = "0x0B306BF915C4d645ff596e518fAf3F9669b97016"; // Polygon Mumbai
   const oracleAbiPath =
-    "./artifacts/contracts/dev/functions/FunctionsOracle.sol/FunctionsOracle.json";
+    "/Users/shivamarora/Documents/Projects/freelanco-dao/deployment/hardhat/artifacts/contracts/dev/functions/FunctionsOracle.sol/FunctionsOracle.json";
   const oracleAbi = JSON.parse(await fs.readFile(oracleAbiPath, "utf8")).abi;
   const oracle = new ethers.Contract(oracleAddress, oracleAbi, signer);
 
@@ -71,6 +71,7 @@ async function main() {
   let doGistCleanup;
   let gistUrl;
   if (typeof secrets !== "undefined") {
+    console.log("getting secrets");
     const result = await getEncryptedSecrets(secrets, oracle, signerPrivateKey);
     if (isObject(secrets)) {
       // inline secrets are uploaded to gist by the script so they must be cleanup at the end of the script
@@ -96,6 +97,8 @@ async function main() {
     store[eventRequestId] = { response: response, err: err };
   });
 
+  console.log("starting");
+
   await new Promise(async (resolve, reject) => {
     let cleanupInProgress = false;
     const cleanup = async () => {
@@ -112,6 +115,7 @@ async function main() {
 
     // Submit the request
     // Order of the parameters is critical
+    console.log("sending request", encryptedSecrets);
     const requestTx = await consumerContract.executeRequest(
       source,
       encryptedSecrets ?? "0x",
@@ -125,6 +129,8 @@ async function main() {
     );
 
     let requestId;
+
+    console.log("request sent, ", requestTx);
 
     console.log(
       `Waiting ${verificationBlocks} blocks for transaction ` +

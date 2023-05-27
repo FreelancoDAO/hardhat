@@ -23,6 +23,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
       allowUnlimitedContractSize: true,
+      // blockGasLimit: 100000000429720, // whatever you want here
     },
     localhost: {
       chainId: 31337,

@@ -393,10 +393,10 @@ contract Freelanco is Ownable {
         uint256 totalMarines = 0;
         uint256 totalCaptains = 0;
 
-        console.log("getting holders");
-        address[] memory holders = _reputation_contract.getHolders();
+        address[] memory holders = _reputation_contract.getHoldersArray();
 
-        console.log("got holders", uint256(holders.length));
+        console.log("getting holders", holders.length);
+
         if (uint256(holders.length) <= 0) {
             console.log("reverting...");
             revert TransactionFailed();
@@ -406,42 +406,65 @@ contract Freelanco is Ownable {
             address holder = holders[i];
             uint8 level = _reputation_contract.getRepo(holder);
 
+            console.log("holder:", holder, level);
+
             console.log("counting");
-            if (level == 1) {
+            if (level == 0) {
                 totalSoldiers++;
-            } else if (level == 2) {
+            } else if (level == 1) {
                 totalMarines++;
-            } else if (level == 3) {
+            } else if (level == 2) {
                 totalCaptains++;
             }
         }
 
         // Calculate the amount of funds to distribute to each level
-        uint256 soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(
-            totalSoldiers
-        );
-        uint256 marinesShare = balance.mul(MARINE_SHARE).div(100).div(
-            totalMarines
-        );
-        uint256 captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(
-            totalCaptains
-        );
+        console.log("counting 2", totalCaptains);
+        uint256 marinesShare;
+        uint256 captainsShare;
+        uint256 soldiersShare;
+        if (totalSoldiers > 0) {
+            soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(
+                totalSoldiers
+            );
+        } else {
+            soldiersShare = 0;
+        }
+        if (totalMarines > 0) {
+            marinesShare = balance.mul(MARINE_SHARE).div(100).div(totalMarines);
+        } else {
+            marinesShare = 0;
+        }
+        if (totalCaptains > 0) {
+            captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(
+                totalCaptains
+            );
+        } else {
+            captainsShare = 0;
+        }
+
+        console.log("distributing");
 
         // Distribute funds to each NFT holder based on their level
         for (uint256 i = 0; i < holders.length; i++) {
             address holder = holders[i];
             uint8 level = _reputation_contract.getRepo(holder);
             uint256 amount = 0;
-            if (level == 1) {
+            if (level == 0) {
                 amount = soldiersShare;
-            } else if (level == 2) {
+            } else if (level == 1) {
                 amount = marinesShare;
-            } else if (level == 3) {
+            } else if (level == 2) {
                 amount = captainsShare;
             }
-            console.log("distributing");
+
             if (amount > 0) {
-                payable(holder).transfer(amount); //change this
+                console.log("sending to", holder, amount);
+
+                (bool sent, ) = holder.call{value: amount}("");
+                if (sent != true) {
+                    revert TransactionFailed();
+                }
             }
         }
     }
@@ -503,6 +526,8 @@ contract Freelanco is Ownable {
                         ._lockedAmount = 0;
                 }
 
+                console.log("slashed money", _10percent);
+
                 emit SlashedFreelancerFunds(
                     _offerId,
                     offerDetails._freelancerAddress,
@@ -538,37 +563,35 @@ contract Freelanco is Ownable {
             revert TransactionFailed();
         }
 
-        // for (uint256 i = 0; i < _counter; i++) {
-        //     Dispute memory d = _counterToDispute[_counter];
-        //     if (
-        //         d.againstParty == msg.sender || d.disputingParty == msg.sender
-        //     ) {
-        //         console.log("bool of status:", d.isDisputeOver);
-        //         console.log("props:", d.proposalId);
+        for (uint256 i = 0; i < _counter; i++) {
+            Dispute memory d = _counterToDispute[_counter];
+            if (
+                d.againstParty == msg.sender || d.disputingParty == msg.sender
+            ) {
+                console.log("isdisputeover 2", d.isDisputeOver, d.proposalId);
 
-        //         if (d.isDisputeOver) {
-        //             console.log("send money");
-        //         }
+                if (d.isDisputeOver) {
+                    console.log("send money");
+                }
 
-        //         // if (o.getOfferStatus() != Offer.ProposalStatus.Dispute_Over) {
-        //         //     revert TransactionFailed();
-        //         // }
-        //     }
-        // }
+                // if (o.getOfferStatus() != Offer.ProposalStatus.Dispute_Over) {
+                //     revert TransactionFailed();
+                // }
+            }
+        }
+        console.log(
+            "withdrew balance:",
+            _freelancers[msg.sender]._lockedAmount
+        );
 
         (bool sent, ) = msg.sender.call{
             value: _freelancers[msg.sender]._lockedAmount
         }("");
 
-        _freelancers[msg.sender]._lockedAmount = 0;
         if (sent != true) {
             revert TransactionFailed();
         }
-
-        console.log(
-            "withdrew balance:",
-            _freelancers[msg.sender]._lockedAmount
-        );
+        _freelancers[msg.sender]._lockedAmount = 0;
 
         emit FreelancerWithrewLockedFunds(
             msg.sender,

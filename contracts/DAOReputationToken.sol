@@ -11,10 +11,13 @@ error RepoToken__Unqualified();
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
     uint32 private constant LEVEL_1_THRESHOLD = 1000;
     uint32 private constant LEVEL_2_THRESHOLD = 10000;
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIds;
 
     enum Level {
         Soldier,
@@ -23,20 +26,42 @@ contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
     }
 
     mapping(address => Level) public ownerToRepo;
-    address[] public nftHolders;
+    uint256 _counter = 0;
+    struct Holder {
+        address _owner;
+        uint256 _tokens;
+        Level level;
+    }
+    mapping(uint256 => Holder) _holders;
+
+    address[] public _holdersArray;
 
     constructor() ERC20("DAOReputationToken", "RT") {}
 
     function mint(address to, uint256 amount) public onlyOwner {
-        console.log("minting reputation token", to, amount);
-        nftHolders.push(to);
-        console.log("pushed", nftHolders.length);
         _mint(to, amount);
+        console.log("minting reputation token", to, amount);
+
+        console.log("pushed counter");
+        _tokenIds.increment();
+        console.log("pushed counter 2");
+        uint256 newItemId = _tokenIds.current();
+        console.log("pushed counter 3");
+
+        _holdersArray.push(to);
+
+        _holders[newItemId] = Holder(to, amount, ownerToRepo[to]);
+
+        console.log("minting");
     }
 
-    function getHolders() public view returns (address[] memory) {
-        console.log("getting", nftHolders.length);
-        return nftHolders;
+    function getHolders(uint256 counter) public view returns (Holder memory) {
+        console.log("getting", _holders[counter]._owner);
+        return _holders[counter];
+    }
+
+    function getHoldersArray() public view returns (address[] memory) {
+        return _holdersArray;
     }
 
     function transfer(address, uint256) public pure override returns (bool) {

@@ -33,6 +33,7 @@ contract GovernorContract is
     GovernorVotesQuorumFraction,
     GovernorTimelockControl,
     FunctionsClient,
+    AutomationCompatible,
     ConfirmedOwner
 {
     //Chainlink Functoins
@@ -117,6 +118,7 @@ contract GovernorContract is
         uint32 gasLimit,
         uint256 proposalId
     ) public returns (bytes32) {
+        console.log("called");
         ProposalData memory data = proposalIdToData[proposalId];
 
         if (!data.shouldGPTVote) {
@@ -130,6 +132,7 @@ contract GovernorContract is
             revert GPTCantVoteDueToProposalStillInVotingPeriod();
         }
         Functions.Request memory req;
+        console.log("initialing");
         req.initializeRequest(
             Functions.Location.Inline,
             Functions.CodeLanguage.JavaScript,
@@ -139,6 +142,7 @@ contract GovernorContract is
             req.addRemoteSecrets(secrets);
         }
         if (args.length > 0) req.addArgs(args);
+        console.log("sending request");
 
         bytes32 assignedReqID = sendRequest(req, subscriptionId, gasLimit);
 
@@ -303,20 +307,6 @@ contract GovernorContract is
             }
         }
 
-        VoterDetails[] memory voters_ = voters[_proposalId];
-
-        address[] memory reputedVoters = new address[](voters_.length);
-
-        for (uint256 j = 0; j < voters_.length; j++) {
-            VoterDetails memory voter = voters_[j];
-            if (result == voter.support) {
-                reputedVoters[j] = voter.account;
-                console.log("reputed", voter.account);
-            }
-        }
-
-        _mintReputationTokens(reputedVoters, _proposalId);
-
         emit OCRResponse(requestId, response, err);
     }
 
@@ -463,6 +453,44 @@ contract GovernorContract is
         uint256 bps
     ) public pure returns (uint256) {
         return (amount * bps) / 10_000;
+    }
+
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    )
+        external
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
+        for (uint256 i = 0; i < counter; i++) {
+            uint256 proposalId = _counterToProposalId[i];
+            if (isProposalReputed(proposalId)) {
+                upkeepNeeded = true;
+            }
+        }
+        upkeepNeeded = false;
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external override {
+        for (uint256 i = 1; i <= counter; i++) {
+            uint256 proposalId = _counterToProposalId[i];
+            if (isProposalReputed(proposalId)) {
+                VoterDetails[] memory voters_ = voters[proposalId];
+                uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
+                address[] memory reputedVoters = new address[](voters_.length);
+
+                for (uint256 j = 0; j < voters_.length; j++) {
+                    VoterDetails memory voter = voters_[j];
+                    if (result == voter.support) {
+                        reputedVoters[j] = voter.account;
+                        console.log("repited", voter.account);
+                    }
+                }
+
+                _mintReputationTokens(reputedVoters, proposalId);
+            }
+        }
     }
 
     function _mintReputationTokens(
