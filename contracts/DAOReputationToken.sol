@@ -13,11 +13,17 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
+import "./governance_standard/GovernorContract.sol";
+
 contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
+    uint256 public immutable amountToMintPerProposal = 10 ether;
+
     uint32 private constant LEVEL_1_THRESHOLD = 1000;
     uint32 private constant LEVEL_2_THRESHOLD = 10000;
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
+
+    GovernorContract governor;
 
     enum Level {
         Soldier,
@@ -77,6 +83,7 @@ contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
         address to,
         uint256
     ) internal override {
+        console.log("after token called");
         if (balanceOf(to) < LEVEL_1_THRESHOLD) {
             ownerToRepo[to] = Level.Soldier;
         }
@@ -89,6 +96,38 @@ contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
             ownerToRepo[to] = Level.Captain;
         } else {
             revert RepoToken__UnableToTransfer();
+        }
+    }
+
+    function setGovernorContract(address payable _governor) public onlyOwner {
+        governor = GovernorContract(_governor);
+    }
+
+    function _mintReputationTokens(
+        address[] memory _voters,
+        uint256 proposalId
+    ) public {
+        uint256 totalVotingPower = 0;
+
+        // Calculate the total voting power of all voters
+        for (uint256 i = 0; i < _voters.length; i++) {
+            uint256 votingPower = governor.getVotes(
+                _voters[i],
+                governor.proposalSnapshot(proposalId)
+            ) / 1 ether;
+            totalVotingPower += votingPower;
+        }
+
+        // Mint tokens proportionally based on each voter's voting power
+        for (uint256 i = 0; i < _voters.length; i++) {
+            uint256 votingPower = governor.getVotes(
+                _voters[i],
+                governor.proposalSnapshot(proposalId)
+            ) / 1 ether;
+            uint256 tokensToMint = (votingPower * amountToMintPerProposal) /
+                totalVotingPower;
+
+            mint(_voters[i], tokensToMint);
         }
     }
 

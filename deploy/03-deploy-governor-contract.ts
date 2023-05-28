@@ -106,7 +106,7 @@ const deployGovernorContract: DeployFunction = async function (
     QUORUM_PERCENTAGE,
     VOTING_PERIOD,
     VOTING_DELAY,
-    governanceReputationToken.address,
+    // governanceReputationToken.address,
     daoNFT.address,
     oracle.address,
   ];
@@ -152,6 +152,8 @@ const deployGovernorContract: DeployFunction = async function (
     governanceReputationToken.address
   );
   const governance = await ethers.getContract("GovernorContract");
+
+  repo.setGovernorContract(governance.address);
 
   const transferTx = await repo.transferOwnership(governance.address);
   await transferTx.wait(1);

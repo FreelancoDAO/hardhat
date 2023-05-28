@@ -49,9 +49,9 @@ contract Freelanco is Ownable {
     uint256 public _disputeCounter;
     uint256 private _daoChargesPercentage = 20;
 
-    uint8 constant SOLDIER_SHARE = 30;
-    uint8 constant MARINE_SHARE = 30;
-    uint8 constant CAPTAIN_SHARE = 40;
+    uint8 constant SOLDIER_SHARE = 20;
+    uint8 constant MARINE_SHARE = 35;
+    uint8 constant CAPTAIN_SHARE = 45;
 
     mapping(uint256 => Dispute) public _counterToDispute;
     mapping(address => Freelancer) public _freelancers;

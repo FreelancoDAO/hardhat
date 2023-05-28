@@ -56,6 +56,9 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.0",
       },
+      {
+        version: "0.6.9",
+      },
     ],
     settings: {
       optimizer: {

@@ -2,22 +2,22 @@ const fs = require("fs")
 const { network } = require("hardhat")
 const { addressFile, abiFile } = require("../../hardhat/helper-hardhat-config")
 
-const frontEndContractsFile = "../frontend/constants/addresses.json"
-const frontEndAbiFile = "../frontend/constants/"
+const frontEndContractsFile = "./frontend/constants/addresses.json"
+const frontEndAbiFile = "./frontend/constants/"
 
 module.exports = async () => {
   console.log("Writing to front end...")
-  await updateContractAddresses("Gig")
-  await updateContractAddresses("Freelanco")
-  await updateContractAddresses("DaoNFT")
-  await updateContractAddresses("GovernorContract")
-  await updateContractAddresses("Whitelist")
-  await updateAbi("Gig")
-  await updateAbi("Freelanco")
-  await updateAbi("DaoNFT")
-  await updateAbi("GovernorContract")
-  await updateAbi("Whitelist")
-  console.log("Front end written!")
+  // await updateContractAddresses("Gig")
+  // await updateContractAddresses("Freelanco")
+  // await updateContractAddresses("DaoNFT")
+  // await updateContractAddresses("GovernorContract")
+  // await updateContractAddresses("Whitelist")
+  // await updateAbi("Gig")
+  // await updateAbi("Freelanco")
+  // await updateAbi("DaoNFT")
+  // await updateAbi("GovernorContract")
+  // await updateAbi("Whitelist")
+  // console.log("Front end written!")
 }
 
 async function updateAbi(contractName) {
