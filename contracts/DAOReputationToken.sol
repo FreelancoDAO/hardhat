@@ -104,30 +104,47 @@ contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
     }
 
     function _mintReputationTokens(
-        address[] memory _voters,
-        uint256 proposalId
+        uint256 proposalId,
+        uint256 counter,
+        uint256 len
     ) public {
+
+        address[] memory reputedVoters = new address[](len);
+
+        for (uint256 i = 1; i <= counter; i++) {
+            (address voter, uint support) = governor.getVoter(proposalId, counter);
+            
+
+            for (uint256 j = 0; j < len; j++) {
+                bool isReputed = governor.isReputedVoter(voter, support, proposalId);
+                if (isReputed) {
+                    reputedVoters[j] = voter;
+                }
+            }
+        
+        }
+
         uint256 totalVotingPower = 0;
 
         // Calculate the total voting power of all voters
-        for (uint256 i = 0; i < _voters.length; i++) {
+        for (uint256 i = 0; i < reputedVoters.length; i++) {
             uint256 votingPower = governor.getVotes(
-                _voters[i],
+                reputedVoters[i],
                 governor.proposalSnapshot(proposalId)
             ) / 1 ether;
             totalVotingPower += votingPower;
         }
 
         // Mint tokens proportionally based on each voter's voting power
-        for (uint256 i = 0; i < _voters.length; i++) {
+        for (uint256 i = 0; i < reputedVoters.length; i++) {
             uint256 votingPower = governor.getVotes(
-                _voters[i],
+                reputedVoters[i],
                 governor.proposalSnapshot(proposalId)
             ) / 1 ether;
             uint256 tokensToMint = (votingPower * amountToMintPerProposal) /
                 totalVotingPower;
 
-            mint(_voters[i], tokensToMint);
+            mint(reputedVoters[i], tokensToMint);
         }
     }
 

@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
-import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
+import "hardhat/console.sol";
 
 library Decide {
     
@@ -72,8 +72,9 @@ interface IDaoNFT {
 interface IDaoRepo {
     function mint(address to, uint256 amount) external virtual;
     function _mintReputationTokens(
-        address[] memory _voters,
-        uint256 proposalId
+        uint256 proposalId,
+        uint256 counter,
+        uint256 len
     ) external;
 }
 
@@ -92,7 +93,7 @@ contract GovernorContract is
     GovernorVotes,
     GovernorVotesQuorumFraction,
     GovernorTimelockControl,
-    AutomationCompatible,
+    
     FunctionsClient,
     ConfirmedOwner
 {
@@ -106,6 +107,7 @@ contract GovernorContract is
         bool shouldGPTVote;
         address[] targets;
         bytes[] calldatas;
+        uint256 result;
     }
 
     struct GPTData {
@@ -267,50 +269,72 @@ contract GovernorContract is
         bytes[] memory datas = new bytes[](1);
         datas[0] = data.calldatas[newresult];
 
+        console.log("executing now");
+
         super._execute(_proposalId, targets, values, datas, "reason");
+
+        proposalIdToData[_proposalId].result = newresult;
+
+        VoterDetails[] memory voters_ = voters[_proposalId];
+
+        console.log("minted");
 
         emit OCRResponse(requestId, response, err);
     }
 
-    function checkUpkeep(
-        bytes calldata /* checkData */
-    )
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory /* performData */)
-    {
-        for (uint256 i = 0; i < counter; i++) {
-            uint256 proposalId = _counterToProposalId[i];
-            if (isProposalReputed(proposalId)) {
-                upkeepNeeded = true;
-            }
-        }
-        upkeepNeeded = false;
+    // function checkUpkeep(
+    //     bytes calldata /* checkData */
+    // )
+    //     external
+    //     view
+    //     override
+    //     returns (bool upkeepNeeded, bytes memory /* performData */)
+    // {
+    //     for (uint256 i = 0; i < counter; i++) {
+    //         uint256 proposalId = _counterToProposalId[i];
+    //         if (isProposalReputed(proposalId)) {
+    //             upkeepNeeded = true;
+    //         }
+    //     }
+    //     upkeepNeeded = false;
+    // }
+
+    // function performUpkeep(bytes calldata /* performData */) external override {
+
+    //     // Decide.getReputedVoters(counter, proposalId);
+
+    //     for (uint256 i = 1; i <= counter; i++) {
+            
+    //         uint256 proposalId = _counterToProposalId[i];
+    //         if (isProposalReputed(proposalId)) {
+    //             VoterDetails[] memory voters_ = voters[proposalId];
+    //             uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
+    //             address[] memory reputedVoters = new address[](voters_.length);
+
+    //             for (uint256 j = 0; j < voters_.length; j++) {
+    //                 VoterDetails memory voter = voters_[j];
+    //                 if (result == voter.support) {
+    //                     reputedVoters[j] = voter.account;
+                        
+    //                 }
+    //             }
+
+    //             reputationContract._mintReputationTokens(reputedVoters, proposalId);
+    //         }
+    //     }
+    // }
+
+    function getVoter(uint256 proposalId, uint256 _counter) public view returns(address, uint) {
+        VoterDetails[] memory voters_ = voters[proposalId];
+        return (voters_[_counter].account, voters_[_counter].support);
     }
 
-    function performUpkeep(bytes calldata /* performData */) external override {
-        for (uint256 i = 1; i <= counter; i++) {
-            
-            uint256 proposalId = _counterToProposalId[i];
-            if (isProposalReputed(proposalId)) {
-                VoterDetails[] memory voters_ = voters[proposalId];
-                uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
-                address[] memory reputedVoters = new address[](voters_.length);
-
-                for (uint256 j = 0; j < voters_.length; j++) {
-                    VoterDetails memory voter = voters_[j];
-                    if (result == voter.support) {
-                        reputedVoters[j] = voter.account;
-                        
-                    }
-                }
-
-                
-
-                reputationContract._mintReputationTokens(reputedVoters, proposalId);
-            }
+    function isReputedVoter(address _voter, uint256 support, uint256 proposalId) public view returns (bool){
+        VoterDetails[] memory votesArray =  voters[proposalId];
+        if(support == proposalIdToData[proposalId].result) {
+            return true; 
         }
+        return false;
     }
 
     function _castVote(
@@ -399,7 +423,8 @@ contract GovernorContract is
             proposalId,
             shouldGPTVote,
             targets,
-            calldatas
+            calldatas,
+            69
         );
 
         return super.propose(targets, values, calldatas, description);

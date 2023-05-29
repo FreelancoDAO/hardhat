@@ -214,7 +214,7 @@ describe("Governor Flow", async () => {
 
     console.log("minting should happpen now");
 
-    await governor.connect(client).performUpkeep("0x");
+    // await governor.connect(client).performUpkeep("0x");
 
     // queue & execute
     // proposalState = await governor.state(proposalId);
