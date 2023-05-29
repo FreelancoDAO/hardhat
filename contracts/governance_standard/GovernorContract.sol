@@ -7,11 +7,10 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
+import "@chainlink/contracts/src/v0.8/AutomationCompatible.sol";
 import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
-
-import "hardhat/console.sol";
 
 library Decide {
     
@@ -93,6 +92,7 @@ contract GovernorContract is
     GovernorVotes,
     GovernorVotesQuorumFraction,
     GovernorTimelockControl,
+    AutomationCompatible,
     FunctionsClient,
     ConfirmedOwner
 {
@@ -148,6 +148,7 @@ contract GovernorContract is
         uint256 _quorumPercentage,
         uint256 _votingPeriod,
         uint256 _votingDelay,
+        IDaoRepo _repoContract,
         IDaoNFT _nftContract,
         address oracle
     )
@@ -164,6 +165,7 @@ contract GovernorContract is
         ConfirmedOwner(msg.sender)
     {
         daoNFTContract = IDaoNFT(_nftContract);
+        reputationContract = IDaoRepo(_repoContract);   
     }
 
     function updateOracleAddress(address oracle) public onlyOwner {
@@ -174,9 +176,9 @@ contract GovernorContract is
         freelancoContract = IFreelanco(_freelancoContract);
     }
 
-    function setRepoContract(address _repoContract) public onlyOwner {
-        reputationContract = IDaoRepo(_repoContract);
-    }
+    // function setRepoContract(address _repoContract) public onlyOwner {
+    //     reputationContract = IDaoRepo(_repoContract);
+    // }
 
     function isProposalReputed(uint256 _proposalId) public view returns (bool) {
         
@@ -270,6 +272,47 @@ contract GovernorContract is
         emit OCRResponse(requestId, response, err);
     }
 
+    function checkUpkeep(
+        bytes calldata /* checkData */
+    )
+        external
+        view
+        override
+        returns (bool upkeepNeeded, bytes memory /* performData */)
+    {
+        for (uint256 i = 0; i < counter; i++) {
+            uint256 proposalId = _counterToProposalId[i];
+            if (isProposalReputed(proposalId)) {
+                upkeepNeeded = true;
+            }
+        }
+        upkeepNeeded = false;
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external override {
+        for (uint256 i = 1; i <= counter; i++) {
+            
+            uint256 proposalId = _counterToProposalId[i];
+            if (isProposalReputed(proposalId)) {
+                VoterDetails[] memory voters_ = voters[proposalId];
+                uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
+                address[] memory reputedVoters = new address[](voters_.length);
+
+                for (uint256 j = 0; j < voters_.length; j++) {
+                    VoterDetails memory voter = voters_[j];
+                    if (result == voter.support) {
+                        reputedVoters[j] = voter.account;
+                        
+                    }
+                }
+
+                
+
+                reputationContract._mintReputationTokens(reputedVoters, proposalId);
+            }
+        }
+    }
+
     function _castVote(
         uint256 proposalId,
         address account,
@@ -277,6 +320,7 @@ contract GovernorContract is
         string memory reason,
         bytes memory params
     ) internal override returns (uint256) {
+        voters[proposalId].push(VoterDetails(account, support));
         if (daoNFTContract.balanceOf(account) <= 0) {
             revert Governor__TransactionFailed();
         }
@@ -338,13 +382,15 @@ contract GovernorContract is
         bytes[] memory calldatas,
         string memory description
     ) public override(Governor, IGovernor) returns (uint256) {
-        
+
+        counter++;
         uint256 proposalId = hashProposal(
             targets,
             values,
             calldatas,
             keccak256(bytes(description))
         );
+        _counterToProposalId[counter] = proposalId;
         
         bool shouldGPTVote = freelancoContract.isProposalDisputed(proposalId);
 

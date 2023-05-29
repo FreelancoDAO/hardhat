@@ -212,7 +212,9 @@ describe("Governor Flow", async () => {
 
     await moveBlocks(VOTING_PERIOD + 1);
 
-    // await governor.connect(client).performUpkeep("0x");
+    console.log("minting should happpen now");
+
+    await governor.connect(client).performUpkeep("0x");
 
     // queue & execute
     // proposalState = await governor.state(proposalId);
