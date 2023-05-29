@@ -4,11 +4,26 @@ pragma solidity ^0.8.9;
 import "./Offer.sol";
 import "./GigNFT.sol";
 import "./DAOReputationToken.sol";
-import "./governance_standard/GovernorContract.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "hardhat/console.sol";
+
+interface IGovernorContract {
+    function hashProposal(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        bytes32 descriptionHash
+    ) external pure returns (uint256);
+
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) external returns (uint256);
+}
 
 error Freelanco__OnlyFreelancerCanDoThisAction();
 error Freelanco__ClientNeedsToEscrow();
@@ -38,7 +53,7 @@ contract Freelanco is Ownable {
     }
 
     //DAO Contracts
-    GovernorContract governor;
+    IGovernorContract governor;
     Gig _nft_contract;
     DAOReputationToken _reputation_contract;
 
@@ -49,9 +64,9 @@ contract Freelanco is Ownable {
     uint256 public _disputeCounter;
     uint256 private _daoChargesPercentage = 20;
 
-    uint8 constant SOLDIER_SHARE = 20;
-    uint8 constant MARINE_SHARE = 35;
-    uint8 constant CAPTAIN_SHARE = 45;
+    uint8 constant SOLDIER_SHARE = 30;
+    uint8 constant MARINE_SHARE = 30;
+    uint8 constant CAPTAIN_SHARE = 40;
 
     mapping(uint256 => Dispute) public _counterToDispute;
     mapping(address => Freelancer) public _freelancers;
@@ -99,11 +114,11 @@ contract Freelanco is Ownable {
     );
 
     constructor(
-        GovernorContract _governorContract,
+        IGovernorContract _governorContract,
         Gig _nftContractAddress,
         DAOReputationToken _reputationContractAddress
     ) {
-        governor = GovernorContract(_governorContract);
+        governor = IGovernorContract(_governorContract);
         _nft_contract = Gig(_nftContractAddress);
         _reputation_contract = DAOReputationToken(_reputationContractAddress);
     }

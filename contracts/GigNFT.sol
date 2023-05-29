@@ -32,6 +32,10 @@ contract Gig is ERC721, ERC721URIStorage, ERC721Burnable {
 
     // The following functions are overrides required by Solidity.
 
+    // function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, ERC721URIStorage) returns (bool) {
+    //     return false;
+    // }
+
     function _beforeTokenTransfer(
         address from,
         address to,
