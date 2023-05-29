@@ -106,7 +106,7 @@ const deployGovernorContract: DeployFunction = async function (
     QUORUM_PERCENTAGE,
     VOTING_PERIOD,
     VOTING_DELAY,
-    governanceReputationToken.address,
+    // governanceReputationToken.address,
     daoNFT.address,
     oracle.address,
   ];

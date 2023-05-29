@@ -10,7 +10,6 @@ import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
-import "hardhat/console.sol";
 
 library Decide {
     
@@ -69,15 +68,6 @@ interface IDaoNFT {
     function balanceOf(address owner) external view virtual returns (uint256);
 }
 
-interface IDaoRepo {
-    function mint(address to, uint256 amount) external virtual;
-    function _mintReputationTokens(
-        uint256 proposalId,
-        uint256 counter,
-        uint256 len
-    ) external;
-}
-
 interface IFreelanco {
     function isProposalDisputed(
         uint256 _proposalID
@@ -93,7 +83,6 @@ contract GovernorContract is
     GovernorVotes,
     GovernorVotesQuorumFraction,
     GovernorTimelockControl,
-    
     FunctionsClient,
     ConfirmedOwner
 {
@@ -107,18 +96,12 @@ contract GovernorContract is
         bool shouldGPTVote;
         address[] targets;
         bytes[] calldatas;
-        uint256 result;
     }
 
     struct GPTData {
         uint8 _voteWay;
         uint256 _id;
         bool hasVoted;
-    }
-
-    struct VoterDetails {
-        address account;
-        uint256 support;
     }
 
     //Chainlink variables
@@ -129,14 +112,8 @@ contract GovernorContract is
     //DAO contracts
     IDaoNFT public daoNFTContract;
     IFreelanco public freelancoContract;
-    IDaoRepo public reputationContract;
 
     //State
-    uint256 public counter = 0;
-    uint256 public immutable amountToMintPerProposal = 10 ether;
-
-    mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
-    mapping(uint256 => uint256) public _counterToProposalId; //minting reputation tokens
     mapping(bytes32 => uint256) public requestIdToProposalId; //chainlink fulflill request id
     mapping(uint256 => GPTData) public proposalIdToGPTData;
     mapping(uint256 => ProposalData) public proposalIdToData; //stores the information about the proposal if GPT needs to execute
@@ -150,7 +127,6 @@ contract GovernorContract is
         uint256 _quorumPercentage,
         uint256 _votingPeriod,
         uint256 _votingDelay,
-        IDaoRepo _repoContract,
         IDaoNFT _nftContract,
         address oracle
     )
@@ -167,7 +143,6 @@ contract GovernorContract is
         ConfirmedOwner(msg.sender)
     {
         daoNFTContract = IDaoNFT(_nftContract);
-        reputationContract = IDaoRepo(_repoContract);   
     }
 
     function updateOracleAddress(address oracle) public onlyOwner {
@@ -176,21 +151,6 @@ contract GovernorContract is
 
     function setFreelancoContract(address _freelancoContract) public onlyOwner {
         freelancoContract = IFreelanco(_freelancoContract);
-    }
-
-    // function setRepoContract(address _repoContract) public onlyOwner {
-    //     reputationContract = IDaoRepo(_repoContract);
-    // }
-
-    function isProposalReputed(uint256 _proposalId) public view returns (bool) {
-        
-        if (
-            state(_proposalId) == ProposalState.Defeated ||
-            state(_proposalId) == ProposalState.Succeeded
-        ) {
-            return true;
-        }
-        return false;
     }
 
     function executeRequest(
@@ -269,72 +229,9 @@ contract GovernorContract is
         bytes[] memory datas = new bytes[](1);
         datas[0] = data.calldatas[newresult];
 
-        console.log("executing now");
-
         super._execute(_proposalId, targets, values, datas, "reason");
 
-        proposalIdToData[_proposalId].result = newresult;
-
-        VoterDetails[] memory voters_ = voters[_proposalId];
-
-        console.log("minted");
-
         emit OCRResponse(requestId, response, err);
-    }
-
-    // function checkUpkeep(
-    //     bytes calldata /* checkData */
-    // )
-    //     external
-    //     view
-    //     override
-    //     returns (bool upkeepNeeded, bytes memory /* performData */)
-    // {
-    //     for (uint256 i = 0; i < counter; i++) {
-    //         uint256 proposalId = _counterToProposalId[i];
-    //         if (isProposalReputed(proposalId)) {
-    //             upkeepNeeded = true;
-    //         }
-    //     }
-    //     upkeepNeeded = false;
-    // }
-
-    // function performUpkeep(bytes calldata /* performData */) external override {
-
-    //     // Decide.getReputedVoters(counter, proposalId);
-
-    //     for (uint256 i = 1; i <= counter; i++) {
-            
-    //         uint256 proposalId = _counterToProposalId[i];
-    //         if (isProposalReputed(proposalId)) {
-    //             VoterDetails[] memory voters_ = voters[proposalId];
-    //             uint256 result = _voteSucceeded(proposalId) ? 1 : 0;
-    //             address[] memory reputedVoters = new address[](voters_.length);
-
-    //             for (uint256 j = 0; j < voters_.length; j++) {
-    //                 VoterDetails memory voter = voters_[j];
-    //                 if (result == voter.support) {
-    //                     reputedVoters[j] = voter.account;
-                        
-    //                 }
-    //             }
-
-    //             reputationContract._mintReputationTokens(reputedVoters, proposalId);
-    //         }
-    //     }
-    // }
-
-    function getVoter(uint256 proposalId, uint256 _counter) public view returns(address, uint) {
-        VoterDetails[] memory voters_ = voters[proposalId];
-        return (voters_[_counter].account, voters_[_counter].support);
-    }
-
-    function isReputedVoter(address _voter, uint256 support, uint256 proposalId) public view returns (bool){
-        VoterDetails[] memory votesArray =  voters[proposalId];
-        if(support == proposalIdToData[proposalId].result) {
-            return true; 
-        }
-        return false;
     }
 
     function _castVote(
@@ -344,7 +241,6 @@ contract GovernorContract is
         string memory reason,
         bytes memory params
     ) internal override returns (uint256) {
-        voters[proposalId].push(VoterDetails(account, support));
         if (daoNFTContract.balanceOf(account) <= 0) {
             revert Governor__TransactionFailed();
         }
@@ -406,15 +302,12 @@ contract GovernorContract is
         bytes[] memory calldatas,
         string memory description
     ) public override(Governor, IGovernor) returns (uint256) {
-
-        counter++;
         uint256 proposalId = hashProposal(
             targets,
             values,
             calldatas,
             keccak256(bytes(description))
         );
-        _counterToProposalId[counter] = proposalId;
         
         bool shouldGPTVote = freelancoContract.isProposalDisputed(proposalId);
 
@@ -423,8 +316,7 @@ contract GovernorContract is
             proposalId,
             shouldGPTVote,
             targets,
-            calldatas,
-            69
+            calldatas
         );
 
         return super.propose(targets, values, calldatas, description);
