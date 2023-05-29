@@ -15,7 +15,7 @@ import "hardhat/console.sol";
 
 library Decide {
     
-    function whichOne(uint8 way, uint8 result, uint256 againstVotes, uint256 forVotes) public view returns (uint8) {
+    function whichOne(uint8 way, uint8 result, uint256 againstVotes, uint256 forVotes) internal view returns (uint8) {
         if (result == 1) {
             //majority voted FOR
             if (way == 1) {
@@ -70,6 +70,13 @@ interface IDaoNFT {
     function balanceOf(address owner) external view virtual returns (uint256);
 }
 
+interface IDaoRepo {
+    function mint(address to, uint256 amount) external virtual;
+    function _mintReputationTokens(
+        address[] memory _voters,
+        uint256 proposalId
+    ) external;
+}
 
 interface IFreelanco {
     function isProposalDisputed(
@@ -107,6 +114,10 @@ contract GovernorContract is
         bool hasVoted;
     }
 
+    struct VoterDetails {
+        address account;
+        uint256 support;
+    }
 
     //Chainlink variables
     bytes32 public latestRequestId;
@@ -116,11 +127,14 @@ contract GovernorContract is
     //DAO contracts
     IDaoNFT public daoNFTContract;
     IFreelanco public freelancoContract;
+    IDaoRepo public reputationContract;
 
     //State
     uint256 public counter = 0;
     uint256 public immutable amountToMintPerProposal = 10 ether;
-    
+
+    mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
+    mapping(uint256 => uint256) public _counterToProposalId; //minting reputation tokens
     mapping(bytes32 => uint256) public requestIdToProposalId; //chainlink fulflill request id
     mapping(uint256 => GPTData) public proposalIdToGPTData;
     mapping(uint256 => ProposalData) public proposalIdToData; //stores the information about the proposal if GPT needs to execute
@@ -158,6 +172,21 @@ contract GovernorContract is
 
     function setFreelancoContract(address _freelancoContract) public onlyOwner {
         freelancoContract = IFreelanco(_freelancoContract);
+    }
+
+    function setRepoContract(address _repoContract) public onlyOwner {
+        reputationContract = IDaoRepo(_repoContract);
+    }
+
+    function isProposalReputed(uint256 _proposalId) public view returns (bool) {
+        
+        if (
+            state(_proposalId) == ProposalState.Defeated ||
+            state(_proposalId) == ProposalState.Succeeded
+        ) {
+            return true;
+        }
+        return false;
     }
 
     function executeRequest(
