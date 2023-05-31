@@ -153,7 +153,7 @@ const deployGovernorContract: DeployFunction = async function (
   );
   const governance = await ethers.getContract("GovernorContract");
 
-  repo.setGovernorContract(governance.address);
+  await repo.setGovernorContract(governance.address);
 
   const transferTx = await repo.transferOwnership(governance.address);
   await transferTx.wait(1);

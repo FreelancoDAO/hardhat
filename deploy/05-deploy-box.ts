@@ -50,7 +50,10 @@ const deployBox: DeployFunction = async function (
   const transferTx = await freelancoC.transferOwnership(timeLock.address);
   await transferTx.wait(1);
 
-  await governor.setFreelancoContract(freelanco.address);
+  const daoNFT = await ethers.getContract("DaoNFT");
+  const repo = await ethers.getContract("DAOReputationToken");
+
+  await governor.setDAOContracts(freelanco.address, daoNFT.address, repo.address);
 };
 
 export default deployBox;
