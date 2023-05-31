@@ -11,6 +11,14 @@ import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 
+interface IDaoRepo {
+    function mint(address to, uint256 amount) external virtual;
+    function _mintReputationTokens(
+        address[] memory reputedVoters, uint256 proposalId
+    ) external;
+}
+
+
 library Decide {
     
     function whichOne(uint8 way, uint8 result, uint256 againstVotes, uint256 forVotes) internal view returns (uint8) {
@@ -88,7 +96,11 @@ contract GovernorContract is
 {
     //Chainlink Functoins
     using Functions for Functions.Request;
-    
+
+    struct VoterDetails {
+        address account;
+        uint256 support;
+    }
 
     struct ProposalData {
         uint256 block_number;
@@ -96,6 +108,7 @@ contract GovernorContract is
         bool shouldGPTVote;
         address[] targets;
         bytes[] calldatas;
+        uint256 result;
     }
 
     struct GPTData {
@@ -110,10 +123,14 @@ contract GovernorContract is
     bytes public latestError;
 
     //DAO contracts
+    IDaoRepo public reputationContract;
     IDaoNFT public daoNFTContract;
     IFreelanco public freelancoContract;
 
     //State
+    uint256 public counter = 0;
+    mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
+    mapping(uint256 => uint256) public _counterToProposalId;
     mapping(bytes32 => uint256) public requestIdToProposalId; //chainlink fulflill request id
     mapping(uint256 => GPTData) public proposalIdToGPTData;
     mapping(uint256 => ProposalData) public proposalIdToData; //stores the information about the proposal if GPT needs to execute
@@ -127,6 +144,7 @@ contract GovernorContract is
         uint256 _quorumPercentage,
         uint256 _votingPeriod,
         uint256 _votingDelay,
+        IDaoRepo _reputationContract,
         IDaoNFT _nftContract,
         address oracle
     )
@@ -142,6 +160,7 @@ contract GovernorContract is
         FunctionsClient(oracle)
         ConfirmedOwner(msg.sender)
     {
+        reputationContract = IDaoRepo(_reputationContract);
         daoNFTContract = IDaoNFT(_nftContract);
     }
 
@@ -153,6 +172,28 @@ contract GovernorContract is
         freelancoContract = IFreelanco(_freelancoContract);
     }
 
+//     function executeRequest(
+//         string calldata source,
+//         bytes calldata secrets,
+//         string[] calldata args,
+//         uint64 subscriptionId,
+//         uint32 gasLimit
+//   ) public onlyOwner returns (bytes32) {
+//         Functions.Request memory req;
+//         req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, source);
+//         if (secrets.length > 0) {
+//         req.addRemoteSecrets(secrets);
+//         }
+//         if (args.length > 0) req.addArgs(args);
+
+//         console.log("args0:", args[0]);
+//         console.log("args1:", args[1]);
+
+//         bytes32 assignedReqID = sendRequest(req, subscriptionId, gasLimit);
+//         latestRequestId = assignedReqID;
+//         return assignedReqID;
+//   }
+
     function executeRequest(
         string calldata source,
         bytes calldata secrets,
@@ -162,7 +203,7 @@ contract GovernorContract is
         uint256 proposalId
     ) public returns (bytes32) {
         
-        ProposalData memory data = proposalIdToData[proposalId];
+        ProposalData storage data = proposalIdToData[proposalId];
 
         if (!data.shouldGPTVote) {
             revert Governor__TransactionFailed();
@@ -185,7 +226,6 @@ contract GovernorContract is
             req.addRemoteSecrets(secrets);
         }
         if (args.length > 0) req.addArgs(args);
-    
 
         bytes32 assignedReqID = sendRequest(req, subscriptionId, gasLimit);
 
@@ -196,16 +236,25 @@ contract GovernorContract is
         return assignedReqID;
     }
 
-    function fulfillRequest(
-        bytes32 requestId,
-        bytes memory response,
-        bytes memory err
-    ) internal override {
+    function fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         latestResponse = response;
         latestError = err;
         uint256 _proposalId = requestIdToProposalId[latestRequestId];
-        
         proposalIdToGPTData[_proposalId] = GPTData(abi.decode(response, (uint8)), _proposalId, true);
+        console.log("GPT VOTED: ", abi.decode(response, (uint8)));
+        emit OCRResponse(requestId, response, err);
+    }
+
+    function executeProposal(uint256 _proposalId) public {
+        if(proposalIdToGPTData[_proposalId].hasVoted == false) {
+            revert Governor__TransactionFailed();
+        }
+        
+        if (
+            block.number < proposalIdToData[_proposalId].block_number + votingDelay() + votingPeriod() + 1 
+        ) {
+            revert Governor__TransactionFailed();
+        }
 
         (
             uint256 againstVotes,
@@ -217,6 +266,7 @@ contract GovernorContract is
 
         // uint newresult = proposalIdToGPTData[_proposalId].whichOne(result);
         uint newresult = Decide.whichOne(gptVote, result, againstVotes, forVotes);
+        proposalIdToData[_proposalId].result = newresult;
         // console.log("new result:", newresult);
 
         ProposalData memory data = proposalIdToData[_proposalId];
@@ -229,10 +279,24 @@ contract GovernorContract is
         bytes[] memory datas = new bytes[](1);
         datas[0] = data.calldatas[newresult];
 
-        super._execute(_proposalId, targets, values, datas, "reason");
+        proposalIdToData[_proposalId].result = newresult;
 
-        emit OCRResponse(requestId, response, err);
+        VoterDetails[] memory voters_ = voters[_proposalId];
+        address[] memory reputedVoters = new address[](voters_.length);
+
+        for (uint256 j = 0; j < voters_.length; j++) {
+            VoterDetails memory voter = voters_[j];
+            if (result == voter.support) {
+                reputedVoters[j] = voter.account;
+                
+            }
+        }
+
+        reputationContract._mintReputationTokens(reputedVoters, _proposalId);
+
+        super._execute(_proposalId, targets, values, datas, "reason");
     }
+
 
     function _castVote(
         uint256 proposalId,
@@ -241,10 +305,25 @@ contract GovernorContract is
         string memory reason,
         bytes memory params
     ) internal override returns (uint256) {
+        voters[proposalId].push(VoterDetails(account, support));
         if (daoNFTContract.balanceOf(account) <= 0) {
             revert Governor__TransactionFailed();
         }
         return super._castVote(proposalId, account, support, reason, params);
+    }
+
+    function getVoter(uint256 proposalId, uint256 _counter) public view returns(address, uint) {
+        VoterDetails[] memory voters_ = voters[proposalId];
+        console.log("voters len:", voters_.length, _counter);
+        return (voters_[_counter].account, voters_[_counter].support);
+    }
+
+    function isReputedVoter(address _voter, uint256 support, uint256 proposalId) public view returns (bool){
+        VoterDetails[] memory votesArray =  voters[proposalId];
+        if(support == proposalIdToData[proposalId].result) {
+            return true; 
+        }
+        return false;
     }
 
     function votingDelay()
@@ -308,6 +387,8 @@ contract GovernorContract is
             calldatas,
             keccak256(bytes(description))
         );
+        counter++;
+        _counterToProposalId[counter] = proposalId;
         
         bool shouldGPTVote = freelancoContract.isProposalDisputed(proposalId);
 
@@ -316,7 +397,8 @@ contract GovernorContract is
             proposalId,
             shouldGPTVote,
             targets,
-            calldatas
+            calldatas,
+            69
         );
 
         return super.propose(targets, values, calldatas, description);
@@ -338,6 +420,9 @@ contract GovernorContract is
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
+        if(proposalIdToData[proposalId].shouldGPTVote == true) {
+            revert Governor__TransactionFailed();
+        }
         super._execute(proposalId, targets, values, calldatas, descriptionHash);
     }
 

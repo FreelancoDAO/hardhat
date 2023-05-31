@@ -33,4 +33,4 @@
 //   return Functions.encodeUint256(0);
 // }
 
-return Functions.encodeUint256(0);
+return Functions.encodeUint256(1);

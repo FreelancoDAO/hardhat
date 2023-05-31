@@ -206,11 +206,16 @@ describe("Governor Flow", async () => {
       console.log(fulfillError);
     }
 
+    console.log("GOT GPT VOTE< NOW EXECUTING");
+
+    
+
     proposalState = await governor.state(proposalId);
     console.log("Before Voting Period State:", proposalState);
     // assert.equal(proposalState.toString(), "1");
 
     await moveBlocks(VOTING_PERIOD + 1);
+    await governor.executeProposal(proposalId);
 
     console.log("minting should happpen now");
 
