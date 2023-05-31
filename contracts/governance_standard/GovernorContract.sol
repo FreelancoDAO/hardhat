@@ -129,6 +129,7 @@ contract GovernorContract is
 
     //State
     uint256 public counter = 0;
+    address public gpt;
     mapping(uint256 => VoterDetails[]) public voters; //deatils of the voters mapped by proposal ID
     mapping(uint256 => uint256) public _counterToProposalId;
     mapping(bytes32 => uint256) public requestIdToProposalId; //chainlink fulflill request id
@@ -162,6 +163,7 @@ contract GovernorContract is
     {
         reputationContract = IDaoRepo(_reputationContract);
         daoNFTContract = IDaoNFT(_nftContract);
+        gpt = msg.sender;
     }
 
     function updateOracleAddress(address oracle) public onlyOwner {
@@ -171,28 +173,6 @@ contract GovernorContract is
     function setFreelancoContract(address _freelancoContract) public onlyOwner {
         freelancoContract = IFreelanco(_freelancoContract);
     }
-
-//     function executeRequest(
-//         string calldata source,
-//         bytes calldata secrets,
-//         string[] calldata args,
-//         uint64 subscriptionId,
-//         uint32 gasLimit
-//   ) public onlyOwner returns (bytes32) {
-//         Functions.Request memory req;
-//         req.initializeRequest(Functions.Location.Inline, Functions.CodeLanguage.JavaScript, source);
-//         if (secrets.length > 0) {
-//         req.addRemoteSecrets(secrets);
-//         }
-//         if (args.length > 0) req.addArgs(args);
-
-//         console.log("args0:", args[0]);
-//         console.log("args1:", args[1]);
-
-//         bytes32 assignedReqID = sendRequest(req, subscriptionId, gasLimit);
-//         latestRequestId = assignedReqID;
-//         return assignedReqID;
-//   }
 
     function executeRequest(
         string calldata source,
@@ -205,14 +185,7 @@ contract GovernorContract is
         
         ProposalData storage data = proposalIdToData[proposalId];
 
-        if (!data.shouldGPTVote) {
-            revert Governor__TransactionFailed();
-        }
-
-        if (
-            data.block_number + votingDelay() + votingPeriod() + 1 <
-            block.number
-        ) {
+        if(msg.sender != gpt) {
             revert Governor__TransactionFailed();
         }
         Functions.Request memory req;
