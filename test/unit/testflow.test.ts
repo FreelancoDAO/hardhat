@@ -215,7 +215,10 @@ describe("Governor Flow", async () => {
     // assert.equal(proposalState.toString(), "1");
 
     await moveBlocks(VOTING_PERIOD + 1);
-    await governor.executeProposal(proposalId);
+    const tx3 = await governor.executeProposal(proposalId);
+    tx3.wait(1);
+
+    await freelanco.getDisputedFunds(offerId);
 
     console.log("minting should happpen now");
 

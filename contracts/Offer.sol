@@ -31,6 +31,8 @@ contract Offer is Ownable {
         ProposalStatus _status;
         string _terms;
         uint _deadline;
+        address receiver;
+        bool isFundsReleased;
     }
 
     Proposal private offer;
@@ -54,7 +56,9 @@ contract Offer is Ownable {
             _freelancer,
             ProposalStatus.Sent,
             _terms,
-            _deadline
+            _deadline,
+            0x0000000000000000000000000000000000000000,
+            false
         );
     }
 
@@ -104,14 +108,31 @@ contract Offer is Ownable {
         proposal._status = ProposalStatus.Over_By_Client;
     }
 
-    function disputeResolved() public onlyOwner {
+    function disputeResolved(address _receiver) public onlyOwner {
         Proposal storage proposal = offer;
         proposal._status = ProposalStatus.Dispute_Over;
+        proposal.receiver = _receiver;
 
         console.log(
             "proosal changed to dispute Over",
-            uint256(proposal._status)
+            uint256(proposal._status),
+            _receiver
         );
+    }
+
+    function isDisputeResolved() public onlyOwner returns (bool) {
+        Proposal storage proposal = offer;
+        return proposal._status == ProposalStatus.Dispute_Over;
+    }
+
+    function getDisputedReceiver() public onlyOwner returns (address){
+        Proposal storage proposal = offer;
+        return proposal.receiver;
+    }
+
+    function fundsReleaased() public onlyOwner {
+        Proposal storage proposal = offer;
+        proposal.isFundsReleased = true;
     }
 
     function setProposalId(uint256 _id) public {

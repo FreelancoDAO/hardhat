@@ -50,6 +50,7 @@ contract Freelanco is Ownable {
         address againstParty;
         uint256 amountEscrowed;
         bool isDisputeOver;
+        address disputeReceiver;
     }
 
     //DAO Contracts
@@ -71,6 +72,8 @@ contract Freelanco is Ownable {
     mapping(uint256 => Dispute) public _counterToDispute;
     mapping(address => Freelancer) public _freelancers;
     mapping(uint256 => Dispute) public proposalIdToDispute;
+
+    address public gpt;
 
     event OfferSent(
         uint256 _offerId,
@@ -121,6 +124,7 @@ contract Freelanco is Ownable {
         governor = IGovernorContract(_governorContract);
         _nft_contract = Gig(_nftContractAddress);
         _reputation_contract = DAOReputationToken(_reputationContractAddress);
+        gpt = msg.sender;
     }
 
     function sendOffer(
@@ -349,7 +353,8 @@ contract Freelanco is Ownable {
             msg.sender,
             offerDetails._freelancerAddress,
             offerDetails._amountEscrowed,
-            false
+            false,
+            0x0000000000000000000000000000000000000000
         );
 
         proposalIdToDispute[proposalId] = _counterToDispute[_disputeCounter];
@@ -391,168 +396,141 @@ contract Freelanco is Ownable {
     }
 
     function withdraw() public onlyOwner {
+
+        (bool sent, ) = gpt.call{value: address(this).balance}(
+                ""
+        );
+        if (sent != true) {
+            revert TransactionFailed();
+        }
+
         // Get the current balance of the Freelanco contract
 
-        console.log("withdrawing..");
+        // console.log("withdrawing..");
 
-        console.log("balance:", address(this).balance);
+        // console.log("balance:", address(this).balance);
 
-        uint256 balance = address(this).balance;
-        if (balance < 0) {
-            console.log("balance low");
-            revert TransactionFailed();
-        }
+        // uint256 balance = address(this).balance;
+        // if (balance < 0) {
+        //     console.log("balance low");
+        //     revert TransactionFailed();
+        // }
 
-        // Calculate the total number of NFT holders in each level
-        uint256 totalSoldiers = 0;
-        uint256 totalMarines = 0;
-        uint256 totalCaptains = 0;
+        // // Calculate the total number of NFT holders in each level
+        // uint256 totalSoldiers = 0;
+        // uint256 totalMarines = 0;
+        // uint256 totalCaptains = 0;
 
-        address[] memory holders = _reputation_contract.getHoldersArray();
+        // address[] memory holders = _reputation_contract.getHoldersArray();
 
-        console.log("getting holders", holders.length);
+        // console.log("getting holders", holders.length);
 
-        if (uint256(holders.length) <= 0) {
-            console.log("reverting...");
-            revert TransactionFailed();
-        }
+        // if (uint256(holders.length) <= 0) {
+        //     console.log("reverting...");
+        //     revert TransactionFailed();
+        // }
 
-        for (uint256 i = 0; i < holders.length; i++) {
-            address holder = holders[i];
-            uint8 level = _reputation_contract.getRepo(holder);
+        // for (uint256 i = 0; i < holders.length; i++) {
+        //     address holder = holders[i];
+        //     uint8 level = _reputation_contract.getRepo(holder);
 
-            console.log("holder:", holder, level);
+        //     console.log("holder:", holder, level);
 
-            console.log("counting");
-            if (level == 0) {
-                totalSoldiers++;
-            } else if (level == 1) {
-                totalMarines++;
-            } else if (level == 2) {
-                totalCaptains++;
-            }
-        }
+        //     console.log("counting");
+        //     if (level == 0) {
+        //         totalSoldiers++;
+        //     } else if (level == 1) {
+        //         totalMarines++;
+        //     } else if (level == 2) {
+        //         totalCaptains++;
+        //     }
+        // }
 
-        // Calculate the amount of funds to distribute to each level
-        console.log("counting 2", totalCaptains);
-        uint256 marinesShare;
-        uint256 captainsShare;
-        uint256 soldiersShare;
-        if (totalSoldiers > 0) {
-            soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(
-                totalSoldiers
-            );
-        } else {
-            soldiersShare = 0;
-        }
-        if (totalMarines > 0) {
-            marinesShare = balance.mul(MARINE_SHARE).div(100).div(totalMarines);
-        } else {
-            marinesShare = 0;
-        }
-        if (totalCaptains > 0) {
-            captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(
-                totalCaptains
-            );
-        } else {
-            captainsShare = 0;
-        }
+        // // Calculate the amount of funds to distribute to each level
+        // console.log("counting 2", totalCaptains);
+        // uint256 marinesShare;
+        // uint256 captainsShare;
+        // uint256 soldiersShare;
+        // if (totalSoldiers > 0) {
+        //     soldiersShare = balance.mul(SOLDIER_SHARE).div(100).div(
+        //         totalSoldiers
+        //     );
+        // } else {
+        //     soldiersShare = 0;
+        // }
+        // if (totalMarines > 0) {
+        //     marinesShare = balance.mul(MARINE_SHARE).div(100).div(totalMarines);
+        // } else {
+        //     marinesShare = 0;
+        // }
+        // if (totalCaptains > 0) {
+        //     captainsShare = balance.mul(CAPTAIN_SHARE).div(100).div(
+        //         totalCaptains
+        //     );
+        // } else {
+        //     captainsShare = 0;
+        // }
 
-        console.log("distributing");
+        // console.log("distributing");
 
-        // Distribute funds to each NFT holder based on their level
-        for (uint256 i = 0; i < holders.length; i++) {
-            address holder = holders[i];
-            uint8 level = _reputation_contract.getRepo(holder);
-            uint256 amount = 0;
-            if (level == 0) {
-                amount = soldiersShare;
-            } else if (level == 1) {
-                amount = marinesShare;
-            } else if (level == 2) {
-                amount = captainsShare;
-            }
+        // // Distribute funds to each NFT holder based on their level
+        // for (uint256 i = 0; i < holders.length; i++) {
+        //     address holder = holders[i];
+        //     uint8 level = _reputation_contract.getRepo(holder);
+        //     uint256 amount = 0;
+        //     if (level == 0) {
+        //         amount = soldiersShare;
+        //     } else if (level == 1) {
+        //         amount = marinesShare;
+        //     } else if (level == 2) {
+        //         amount = captainsShare;
+        //     }
 
-            if (amount > 0) {
-                console.log("sending to", holder, amount);
+        //     if (amount > 0) {
+        //         console.log("sending to", holder, amount);
 
-                (bool sent, ) = holder.call{value: amount}("");
-                if (sent != true) {
-                    revert TransactionFailed();
-                }
-            }
-        }
+        //         (bool sent, ) = holder.call{value: amount}("");
+        //         if (sent != true) {
+        //             revert TransactionFailed();
+        //         }
+        //     }
+        // }
     }
 
     function handleDispute(
         uint256 _offerId,
         address receiver
     ) public onlyOwner {
+        console.log("HANDLING OFFER ID", _offerId);
         Offer offerContract = Offer(offers[_offerId]);
-        console.log("offercontract", address(offerContract));
-        Offer.Proposal memory offerDetails = offerContract.getDetails();
+        offerContract.disputeResolved(receiver);
 
-        if (
-            offerDetails._freelancerAddress == receiver ||
-            offerDetails._client == receiver
-        ) {
-            (bool sent, ) = receiver.call{value: offerDetails._amountEscrowed}(
-                ""
-            );
-            if (sent != true) {
-                revert TransactionFailed();
-            }
+        console.log("RECIEVER:", receiver);
+    }
 
-            console.log("dispute handled");
-            uint256 _proposalid = offerContract.getProposalId();
-
-            Dispute memory dispute = proposalIdToDispute[_proposalid];
-            dispute.isDisputeOver = true;
-
-            console.log("isdisputeover", dispute.isDisputeOver, _proposalid);
-
-            offerContract.disputeResolved();
-
-            console.log("balance: ", address(this).balance);
-
-            //slash freelancers money if deposited for boosting
-            if (offerDetails._client == receiver) {
-                uint256 bps = 1000; // 10%
-                uint256 _10percent = calculatePercentage(
-                    offerDetails._amountEscrowed,
-                    bps
-                );
-
-                if (
-                    _freelancers[offerDetails._freelancerAddress]
-                        ._lockedAmount >= _10percent
-                ) {
-                    _freelancers[offerDetails._freelancerAddress]
-                        ._lockedAmount -= _10percent;
-                } else if (
-                    _freelancers[offerDetails._freelancerAddress]
-                        ._lockedAmount >=
-                    0 &&
-                    _freelancers[offerDetails._freelancerAddress]
-                        ._lockedAmount <=
-                    _10percent
-                ) {
-                    _freelancers[offerDetails._freelancerAddress]
-                        ._lockedAmount = 0;
-                }
-
-                console.log("slashed money", _10percent);
-
-                emit SlashedFreelancerFunds(
-                    _offerId,
-                    offerDetails._freelancerAddress,
-                    _10percent
-                );
-            }
-        } else {
+    function getDisputedFunds(uint256 _offerId) public {
+        console.log("SENDER:", msg.sender);
+        
+        Offer offerContract = Offer(offers[_offerId]);
+        Offer.Proposal memory offerDetails = offerContract.getDetails();        
+        
+        if(offerContract.isDisputeResolved() == false){
             revert TransactionFailed();
         }
 
+        if(msg.sender != offerContract.getDisputedReceiver())
+        {
+            console.log("DISPUTE RECIEVER INVALID");
+            revert TransactionFailed();
+        }
+        (bool sent, ) = msg.sender.call{value: offerDetails._amountEscrowed}(
+                ""
+        );
+        if (sent != true) {
+            revert TransactionFailed();
+        }
+        offerContract.fundsReleaased();
+        console.log("GOT RESOLVED FULLY");
         emit OfferStatusUpdated(_offerId, Offer.ProposalStatus.Dispute_Over);
     }
 
@@ -577,27 +555,6 @@ contract Freelanco is Ownable {
         if (_freelancers[msg.sender]._deadlineBlocks > block.number) {
             revert TransactionFailed();
         }
-
-        for (uint256 i = 0; i < _counter; i++) {
-            Dispute memory d = _counterToDispute[_counter];
-            if (
-                d.againstParty == msg.sender || d.disputingParty == msg.sender
-            ) {
-                console.log("isdisputeover 2", d.isDisputeOver, d.proposalId);
-
-                if (d.isDisputeOver) {
-                    console.log("send money");
-                }
-
-                // if (o.getOfferStatus() != Offer.ProposalStatus.Dispute_Over) {
-                //     revert TransactionFailed();
-                // }
-            }
-        }
-        console.log(
-            "withdrew balance:",
-            _freelancers[msg.sender]._lockedAmount
-        );
 
         (bool sent, ) = msg.sender.call{
             value: _freelancers[msg.sender]._lockedAmount
