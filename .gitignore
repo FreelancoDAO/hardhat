@@ -1,0 +1,10 @@
+artifacts/
+cache/
+docs/
+typechain-types/
+yarn.lock
+deployments/
+node_modules/
+.env
+gas-report.txt
+.DS_Store
