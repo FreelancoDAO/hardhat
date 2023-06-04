@@ -111,7 +111,7 @@ const setAutoRequest = async (contract, taskArgs) => {
 
   // Clean up previous secretsURLs
   if (!create) {
-    console.log(`Attempting to clean up previous GitHub Gist secrets`)
+    console.log("Attempting to clean up previous GitHub Gist secrets")
     await Promise.all(
       previousSecretURLs.map(async (url) => {
         if (!url.includes("github")) return console.log(`\n${url} is not a GitHub Gist - skipping`)

@@ -148,7 +148,7 @@ async function main(prompt, proposalId) {
     requestId = requestEvent.args.id;
     console.log(`\nRequest ${requestId} initiated`);
 
-    console.log(`Waiting for fulfillment...\n`);
+    console.log("Waiting for fulfillment...\n");
 
     // poll
     let polling;
@@ -302,8 +302,8 @@ async function verifyOffchainSecrets(secretsURLs, oracle) {
     ) {
       throw Error(
         `Off-chain secrets URLs ${url} and ${offchainSecretsResponses[0].url} ` +
-          `do not contain the same JSON object. All secrets URLs must have an ` +
-          `identical JSON object.`
+          "do not contain the same JSON object. All secrets URLs must have an " +
+          "identical JSON object."
       );
     }
 
@@ -312,7 +312,7 @@ async function verifyOffchainSecrets(secretsURLs, oracle) {
         if (!secrets["0x0"]) {
           throw Error(
             `No secrets specified for node ${nodeAddress.toLowerCase()} and ` +
-              `no default secrets found.`
+              "no default secrets found."
           );
         }
       }
