@@ -69,7 +69,7 @@ task("functions-sub-create", "Creates a new billing subscription for Functions c
         ethers.utils.defaultAbiCoder.encode(["uint64"], [subscriptionId])
       )
       // If a consumer was also specified, wait 1 block instead of networks[network.name].confirmations blocks
-      const fundWaitBlockConfirmations = !!consumer ? 1 : networks[network.name].confirmations
+      const fundWaitBlockConfirmations = (consumer) ? 1 : networks[network.name].confirmations
       console.log(`Waiting ${fundWaitBlockConfirmations} blocks for transaction ${fundTx.hash} to be confirmed...`)
       await fundTx.wait(fundWaitBlockConfirmations)
 
