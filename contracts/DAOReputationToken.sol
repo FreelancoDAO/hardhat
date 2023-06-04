@@ -12,6 +12,10 @@ error RepoToken__UnableToTransfer();
 error RepoToken__UnableToApprove();
 error RepoToken__Unqualified();
 
+/**
+ * @title DAOReputation
+ * @dev Contract responsible for minting DAO ERC20 tokens based on succeeded voting.
+ */
 contract DAOReputationToken is ERC20, ERC20Burnable, Ownable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;

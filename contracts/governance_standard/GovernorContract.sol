@@ -11,20 +11,14 @@ import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
 import {Functions, FunctionsClient} from "../dev/functions/FunctionsClient.sol";
 // import "@chainlink/contracts/src/v0.8/dev/functions/FunctionsClient.sol"; // Once published
 import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
-
-
-interface IDaoNFT {
-    function balanceOf(address owner) external view virtual returns (uint256);
-}
-
-interface IFreelanco {
-    function isProposalDisputed(
-        uint256 _proposalID
-    ) external view returns (bool);
-}
+import "./IDAO.sol";
 
 error Governor__TransactionFailed();
 
+/**
+ * @title GovernorContract
+ * @dev The GovernorContract contract is responsible for managing proposals but TIMELOCK executes it.
+ */
 contract GovernorContract is
     Governor,
     GovernorSettings,

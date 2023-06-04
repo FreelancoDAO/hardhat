@@ -8,6 +8,10 @@ import "hardhat/console.sol";
 
 error Escrow__TransactionFailed();
 
+/**
+ * @title Escrow Contract
+ * @dev The Escrow contract meant to handle the escrow operations, making sure consensus is met between freelancer and client and also responsible for handling disputes. 
+ */
 abstract contract Escrow {
     using SafeMath for uint256;
 

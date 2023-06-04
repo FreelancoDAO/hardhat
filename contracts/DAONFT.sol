@@ -15,6 +15,10 @@ error DaoNFT__TransferFailed();
 error DaoNFT__Unqualified();
 error DaoNFT__TransactionFailed();
 
+/**
+ * @title DAO_NFt
+ * @dev Contract responsible for minting DAO NFTs tokens for joining the DAO.
+ */
 contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
     using SafeMath for uint256;
 

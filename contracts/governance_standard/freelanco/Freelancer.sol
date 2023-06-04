@@ -3,6 +3,10 @@ pragma solidity ^0.8.9;
 
 error Freelancer__TransactionFailed();
 
+/**
+ * @title Freelancer Contract
+ * @dev The Freelancer contract meant to handle the Freelancers boosting. 
+ */
 abstract contract DAOFreelancer {
 
     struct Freelancer {

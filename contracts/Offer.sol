@@ -8,6 +8,10 @@ error Offer__OnlyFreelancerCanDoThisAction();
 error Offer__TransactionFailed();
 error Offer__InvalidEntry();
 
+/**
+ * @title Offer
+ * @dev A contract that manages offers of clients.
+ */
 contract Offer is Ownable {
     enum ProposalStatus {
         Sent, //Escrowed By Client

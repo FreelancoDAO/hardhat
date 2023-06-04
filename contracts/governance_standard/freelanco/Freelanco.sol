@@ -6,26 +6,15 @@ import "../../GigNFT.sol";
 import "../../DAOReputationToken.sol";
 import "./Escrow.sol";
 import "./Freelancer.sol";
+import "./IGovernorContract.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-
-interface IGovernorContract {
-    function hashProposal(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        bytes32 descriptionHash
-    ) external pure returns (uint256);
-
-    function propose(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        string memory description
-    ) external returns (uint256);
-}
 
 error Freelanco__TransactionFailed();
 
+/**
+ * @title FreelancoDAO
+ * @dev The Freelanco contract meant to handle the Clients and Freelancers operations. It is also owned by the DAO.
+ */
 contract Freelanco is Ownable, Escrow, DAOFreelancer {
     using SafeMath for uint256;
 

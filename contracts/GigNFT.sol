@@ -7,6 +7,10 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
 
+/**
+ * @title Gig
+ * @dev Contract responsible for minting Gig NFTs for Freelancers to showcase their work on the platform.
+ */
 contract Gig is ERC721, ERC721URIStorage, ERC721Burnable {
     using Counters for Counters.Counter;
 
