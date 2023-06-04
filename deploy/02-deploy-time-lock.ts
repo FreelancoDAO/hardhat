@@ -5,7 +5,7 @@ import { networkConfig, developmentChains, MIN_DELAY } from "../helper-hardhat-c
 import { ethers } from "hardhat"
 
 const deployTimeLock: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  // @ts-ignore
+  // @ts-expect-error
   const { getNamedAccounts, deployments, network } = hre
   const { deploy, log } = deployments
   const { deployer } = await getNamedAccounts()

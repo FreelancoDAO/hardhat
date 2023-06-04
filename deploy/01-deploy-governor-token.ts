@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
 const deployGovernanceToken: DeployFunction = async function (
   hre: HardhatRuntimeEnvironment
 ) {
-  // @ts-ignore
+  // @ts-expect-error
   const { getNamedAccounts, deployments, network } = hre;
   const { deploy, log } = deployments;
   const { deployer, againstVoter } = await getNamedAccounts();
