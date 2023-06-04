@@ -198,7 +198,10 @@ contract GovernorContract is
     Requirements:
         Only the GPT contract is allowed to call this function.
     */
-    function executeProposal(uint256 _proposalId) public onlyGPT() {
+    function executeProposal(uint256 _proposalId) public {
+        if(proposalIdToGPTData[_proposalId].hasVoted == false) {
+            revert Governor__TransactionFailed();
+        }
         (
             uint256 againstVotes,
             uint256 forVotes,
