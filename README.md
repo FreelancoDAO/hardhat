@@ -16,22 +16,16 @@
         <img src="https://img.shields.io/badge/OpenZeppelin-4E5EE4?logo=OpenZeppelin&logoColor=fff&style=for-the-badge" alt="Vercel">
     </a>
     </div>
-    <a href="https://deepsource.io/gh/lensterxyz/lenster">
-        <img src="https://deepsource.io/gh/lensterxyz/lenster.svg/?label=active+issues&show_trend=true" alt="GitHub actions">
-    </a>
-    <a href="https://www.gitpoap.io/gh/lensterxyz/lenster">
+    <a href="https://deepsource.io/gh/FreelancoDAO/hardhat">
         <img src="https://public-api.gitpoap.io/v1/repo/FreelancoDAO/hardhat/badge" alt="Gitpoap">
     </a>
-    <a href="https://status.lenster.xyz">
-        <img height="20px" src="https://betteruptime.com/status-badges/v1/monitor/dfaw.svg" alt="Uptime">
-    </a>
-    <a href="https://github.com/lensterxyz/lenster/stargazers">
+    <a href="https://github.com/FreelancoDAO/hardhat/stargazers">
         <img src="https://img.shields.io/github/stars/FreelancoDAO/hardhat?label=Stars&logo=github" alt="Stargazers">
     </a>
-    <a href="https://github.com/lensterxyz/lenster/blob/main/LICENSE">
+    <a href="https://github.com/FreelancoDAO/hardhat/blob/main/LICENSE">
         <img src="https://img.shields.io/github/license/FreelancoDAO/hardhat?label=Licence&logo=gnu" alt="License">
     </a>
-    <a href="https://github.com/orgs/lensterxyz/projects/6/views/3">
+    <a href="https://github.com/FreelancoDAO/hardhat">
         <img src="https://img.shields.io/github/issues/FreelancoDAO/hardhat/Bounty?color=8b5cf6&label=Bounties&logo=ethereum" alt="Bounties">
     </a>
 </div>
