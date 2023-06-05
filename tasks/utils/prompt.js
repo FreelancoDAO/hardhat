@@ -39,7 +39,7 @@ async function promptTxCost(gasEstimate, hre, skipPrompt = false) {
   const nativePriceUSD = await getPriceUSD(network.config.linkPriceFeed, hre.ethers)
   const transactionEstimateUSD = transactionEstimateNative * nativePriceUSD
 
-  console.log(`Estimating cost if the current gas price remains the same...\n`)
+  console.log("Estimating cost if the current gas price remains the same...\n")
 
   console.log(`The transaction to initiate this request will charge the wallet (${signer.address}):`)
   console.log(

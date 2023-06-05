@@ -36,5 +36,5 @@ task("functions-perform-upkeep", "Manually call performUpkeep in an Automation c
     )
     await checkUpkeep.wait(networks[network.name].confirmations)
 
-    console.log(`\nSuccessfully called performUpkeep`)
+    console.log("\nSuccessfully called performUpkeep")
   })
