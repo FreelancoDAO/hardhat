@@ -1,7 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types"
 import { DeployFunction } from "hardhat-deploy/types"
 import verify from "../helper-functions"
-import { networkConfig, developmentChains, MIN_DELAY } from "../helper-hardhat-config"
+import { developmentChains, MIN_DELAY } from "../helper-hardhat-config"
+import { networks } from "../networks.js";
 import { ethers } from "hardhat"
 
 const deployTimeLock: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -22,7 +23,7 @@ const deployTimeLock: DeployFunction = async function (hre: HardhatRuntimeEnviro
     args: [MIN_DELAY, [], [], deployer],
     log: true,
     // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[network.name].blockConfirmations || 1,
+    waitConfirmations: networks[network.name]?.blockConfirmations || 1,
   })
   log(`TimeLock at ${timeLock.address}`)
   

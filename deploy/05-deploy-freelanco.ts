@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import verify from "../helper-functions";
-import { networkConfig, developmentChains } from "../helper-hardhat-config";
+import { networks as networkConfig } from "../networks.js";
 import { ethers } from "hardhat";
 
 const deployBox: DeployFunction = async function (
@@ -23,7 +23,7 @@ const deployBox: DeployFunction = async function (
     args: [],
     log: true,
     // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[hre.network.name].blockConfirmations || 1,
+    waitConfirmations: networkConfig[hre.network.name]?.blockConfirmations || 1,
   });
 
   const whitelist = await deploy("Whitelist", {
@@ -31,7 +31,7 @@ const deployBox: DeployFunction = async function (
     args: [],
     log: true,
     // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[hre.network.name].blockConfirmations || 1,
+    waitConfirmations: networkConfig[hre.network.name]?.blockConfirmations || 1,
   });
 
   const freelanco = await deploy("Freelanco", {
@@ -39,7 +39,7 @@ const deployBox: DeployFunction = async function (
     args: [governor.address, gigNFT.address, reputation.address],
     log: true,
     // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[hre.network.name].blockConfirmations || 1,
+    waitConfirmations: networkConfig[hre.network.name]?.blockConfirmations || 1,
   });
   log(`freelanco at ${freelanco.address}`);
   const freelancoC = await ethers.getContractAt("Freelanco", freelanco.address);

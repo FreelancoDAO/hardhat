@@ -62,7 +62,6 @@ contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
         address vrfCoordinatorV2,
         uint64 subscriptionId,
         bytes32 gasLane, // keyHash
-        // uint256 mintFee,
         uint32 callbackGasLimit,
         string[3] memory level_0_dogTokenUris,
         string[3] memory level_1_dogTokenUris,

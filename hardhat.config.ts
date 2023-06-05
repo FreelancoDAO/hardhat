@@ -12,12 +12,8 @@ import "@openzeppelin/hardhat-upgrades";
 import "./tasks"
 const { networks } = require("./networks")
 
-// const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || ""
-// const SEPOLIA_RPC_URL =
-//   process.env.SEPOLIA_RPC_URL || "https://eth-sepolia.g.alchemy.com/v2/YOUR-API-KEY"
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "privatKey";
 const ETHERSCAN_API_KEY =
-  process.env.ETHERSCAN_API_KEY || "VHIK1926T58YMZS4MS1DVCRYJF8D7T1TRQ";
+  process.env.ETHERSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
   defaultNetwork: "hardhat",
@@ -32,19 +28,7 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
     },
     ...networks,
-    // polygon: {
-    //   url: "https://polygon-mumbai.g.alchemy.com/v2/ilstxE0yedAjbQEDV1TaurFfb4Po9Hyw",
-    //   accounts: [
-    //     "aa63b248bea47e42af354c1a6285b8e62edeaddd9d733f9750d2aed7fde198e1",
-    //     //  0xb815be93479f82444892f891b117c7919cb232624e82487f8cd5d7c3fefea026,
-    //   ],
     },
-    // sepolia: {
-    //   url: SEPOLIA_RPC_URL,
-    //   accounts: [PRIVATE_KEY],
-    //   chainId: 11155111,
-    // },
-  // },
   solidity: {
     compilers: [
       {

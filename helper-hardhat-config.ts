@@ -7,18 +7,7 @@ export interface networkConfigInfo {
   [key: string]: networkConfigItem
 }
 
-export const networkConfig: networkConfigInfo = {
-  localhost: {},
-  hardhat: {},
-  sepolia: {
-    blockConfirmations: 6,
-  },
-  polygon: {
-    blockConfirmations: 6,
-  },
-}
-
-export const developmentChains = ["hardhat", "localhost"]
+export const developmentChains = [31337]
 export const proposalsFile = "proposals.json"
 
 // Governor Values

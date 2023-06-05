@@ -1,7 +1,8 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
 import verify from "../helper-functions";
-import { networkConfig, developmentChains } from "../helper-hardhat-config";
+import { developmentChains } from "../helper-hardhat-config";
+import { networks as networkConfig } from "../networks.js";
 import { ethers } from "hardhat";
 
 const deployGovernanceToken: DeployFunction = async function (
@@ -18,7 +19,7 @@ const deployGovernanceToken: DeployFunction = async function (
     args: [],
     log: true,
     // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[network.name].blockConfirmations || 1,
+    waitConfirmations: networkConfig[network.name]?.blockConfirmations || 1,
   });
   log(`GovernanceToken at ${governanceToken.address}`);
   if (
@@ -27,9 +28,12 @@ const deployGovernanceToken: DeployFunction = async function (
   ) {
     await verify(governanceToken.address, []);
   }
+  
   log(`Delegating to ${deployer}`);
-  await delegate(governanceToken.address, deployer);
-  log("Delegated!");
+  const chainId = network.config.chainId
+  const isLocalOrDevChain = chainId == 31337
+  if(isLocalOrDevChain) await delegate(governanceToken.address, deployer);
+  
 };
 
 const delegate = async (
@@ -40,10 +44,7 @@ const delegate = async (
     "GovernanceToken",
     governanceTokenAddress
   );
-
-  const [freelancer, client, voter, voter3] = await ethers.getSigners();
-
-  governanceToken.transfer(client.address, BigInt("900000000000000000000000"));
+  governanceToken.transfer(delegatedAccount, BigInt("900000000000000000000000"));
 
   const transactionResponse = await governanceToken.delegate(delegatedAccount);
 

@@ -13,6 +13,7 @@ const networkConfig = {
     jobId: "29fa9aa13bf1468788b7cc4a500a45b8",
     fundAmount: "1000000000000000000",
     automationUpdateInterval: "30",
+    subId: 1
   },
   31337: {
     name: "localhost",
@@ -22,6 +23,7 @@ const networkConfig = {
     fundAmount: "1000000000000000000",
     automationUpdateInterval: "30",
     ethUsdPriceFeed: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+    subId: 1
   },
   1: {
     name: "mainnet",
@@ -64,8 +66,10 @@ const networkConfig = {
     fee: "100000000000000000",
     fundAmount: "100000000000000000", // 0.1
     automationUpdateInterval: "30",
+    subId: 1318
   },
 }
+
 
 const deployGovernanceToken = async function (hre) {
   const { deployer } = await hre.getNamedAccounts()
@@ -73,6 +77,9 @@ const deployGovernanceToken = async function (hre) {
   const { deploy, log } = deployments
 
   const chainId = network.config.chainId
+  const isLocalOrDevChain = developmentChains.includes(chainId)
+  console.log(networkConfig[chainId])
+  const gas_limit = 500000
 
   log("----------------------------------------------------")
   log("Deploying Reputation and waiting for confirmations...")
@@ -89,29 +96,34 @@ const deployGovernanceToken = async function (hre) {
 
   log("----------------------------------------------------")
   log("Deploying Mock")
-  const BASE_FEE = BigNumber.from("100000000000000000") // 0.25 is this the premium in LINK?
-  const GAS_PRICE_LINK = 1e9 // link per gas, is this the gas lane? // 0.000000001 LINK per gas
+  let vrfCoordinatorV2Mock, subscriptionId, vrf;
+  if (isLocalOrDevChain) {
+    const BASE_FEE = BigNumber.from("100000000000000000") // 0.25 is this the premium in LINK?
+    const GAS_PRICE_LINK = 1e9 // link per gas, is this the gas lane? // 0.000000001 LINK per gas
 
-  const vrf = await deploy("VRFCoordinatorV2Mock", {
-    from: deployer,
-    log: true,
-    args: [BASE_FEE, GAS_PRICE_LINK],
-  })
+    vrf = await deploy("VRFCoordinatorV2Mock", {
+      from: deployer,
+      log: true,
+      args: [BASE_FEE, GAS_PRICE_LINK],
+    })
 
-  log(`VRF deployed to ${vrf.address}`)
+    log(`VRF deployed to ${vrf.address}`)
 
-  const FUND_AMOUNT = "1000000000000000000000"
-  let vrfCoordinatorV2Address, subscriptionId
+    const FUND_AMOUNT = "1000000000000000000000"
+    let vrfCoordinatorV2Address, subscriptionId
 
-  const vrfCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock")
+    vrfCoordinatorV2Mock = await ethers.getContract("VRFCoordinatorV2Mock")
+    
 
-  const transactionResponse = await vrfCoordinatorV2Mock.createSubscription()
-  const transactionReceipt = await transactionResponse.wait()
+    const transactionResponse = await vrfCoordinatorV2Mock.createSubscription()
+    const transactionReceipt = await transactionResponse.wait()
 
-  subscriptionId = transactionReceipt.events[0].args.subId
+    subscriptionId = transactionReceipt.events[0].args.subId
 
-  await vrfCoordinatorV2Mock.fundSubscription(subscriptionId, FUND_AMOUNT)
-  console.log("Subscription funded", subscriptionId)
+    await vrfCoordinatorV2Mock.fundSubscription(subscriptionId, FUND_AMOUNT)
+    console.log("Subscription funded", subscriptionId)
+
+  } 
 
   let level0 = [
     "bafkreig5txvhpsmj3ktwksbtqfuioawzpqklonkek2j67ezgrvw4hojxpm",
@@ -131,16 +143,29 @@ const deployGovernanceToken = async function (hre) {
     "bafkreich24l2kthxjhex667n6t2mlg3rjj2na6qrnqrcgpmroo5a6vqmvq",
   ]
 
+  if(isLocalOrDevChain){
   arguments = [
     vrf.address,
-    subscriptionId,
-    "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc",
-    500000,
+    networkConfig[chainId].subId,
+    networkConfig[chainId].keyHash,
+    gas_limit,
     level0,
     level1,
     level2,
     repotoken.address,
   ]
+} else {
+  arguments = [
+    networkConfig[chainId].vrfCoordinator,
+    networkConfig[chainId].subId,
+    networkConfig[chainId].keyHash,
+    gas_limit,
+    level0,
+    level1,
+    level2,
+    repotoken.address,
+  ]
+}
 
   const daoNFT = await deploy("DaoNFT", {
     from: deployer,
@@ -148,12 +173,17 @@ const deployGovernanceToken = async function (hre) {
     log: true,
     waitConfirmations: 1,
   })
+  
+  if(vrfCoordinatorV2Mock){
+    const tx = await vrfCoordinatorV2Mock.addConsumer(networkConfig[chainId].subId, daoNFT.address)
+    console.log("Consumer Added", tx.address)
+  } else {
+    const vrfCoordinatorV2Mock = await hre.ethers.getContractAt("VRFCoordinatorV2Mock", networkConfig[chainId].vrfCoordinator);
+    const tx = await vrfCoordinatorV2Mock.addConsumer(networkConfig[chainId].subId, daoNFT.address)
 
-  console.log("Deployed DAONFT: ", daoNFT.address)
+    console.log("Consumer Added", tx.address)
+  }
 
-  const tx = await vrfCoordinatorV2Mock.addConsumer(subscriptionId, daoNFT.address)
-
-  console.log("Consumer Added", tx.address)
 }
 
 deployGovernanceToken.tags = ["all", "reputationtoken"]

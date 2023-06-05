@@ -37,7 +37,7 @@ const networks = {
   polygonMumbai: {
     url: process.env.POLYGON_MUMBAI_RPC_URL,
     gasPrice: undefined,
-    accounts: [process.env.PRIVATE_KEY],
+    accounts: [PRIVATE_KEY],
     verifyApiKey: process.env.POLYGONSCAN_API_KEY || "UNSET",
     chainId: 80001,
     confirmations: DEFAULT_VERIFICATION_BLOCK_CONFIRMATIONS,
@@ -47,6 +47,7 @@ const networks = {
     functionsOracleProxy: "0xeA6721aC65BCeD841B8ec3fc5fEdeA6141a0aDE4",
     functionsBillingRegistryProxy: "0xEe9Bf52E5Ea228404bB54BCFbbDa8c21131b9039",
     functionsPublicKey: SHARED_DON_PUBLIC_KEY,
+    blockConfirmations: DEFAULT_VERIFICATION_BLOCK_CONFIRMATIONS,
   },
   avalancheFuji: {
     url: process.env.AVALANCHE_FUJI_RPC_URL || "UNSET",
