@@ -5,8 +5,9 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "./DAOReputationToken.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./DAOReputationToken.sol";
+import "./IWhitelist.sol";
 
 error DaoNFT__AlreadyInitialized();
 error DaoNFT__NeedMoreETHSent();
@@ -53,6 +54,7 @@ contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
     uint8 constant CAPTAIN_SHARE = 40;
 
     DAOReputationToken public repoContract;
+    IWhitelist public whitelistContract;
 
     // Events
     event NftRequested(uint256 indexed requestId, address requester);
@@ -66,7 +68,8 @@ contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
         string[3] memory level_0_dogTokenUris,
         string[3] memory level_1_dogTokenUris,
         string[3] memory level_2_dogTokenUris,
-        DAOReputationToken _reputationContract
+        DAOReputationToken _reputationContract,
+        IWhitelist _whitelistContract
     ) VRFConsumerBaseV2(vrfCoordinatorV2) ERC721("Freelanco DAO", "FDAO") {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
@@ -80,13 +83,16 @@ contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
         );
         s_tokenCounter = 0;
         repoContract = DAOReputationToken(_reputationContract);
+        whitelistContract = IWhitelist(_whitelistContract);
     }
 
     function requestNft() public payable returns (uint256 requestId) {
         Level level;
         if (repoContract.getRepo(msg.sender) == 0) {
-            if (msg.value < i_mintFee) {
-                revert DaoNFT__NeedMoreETHSent();
+            if(whitelistContract.isWhitelisted(msg.sender) == false){
+                if (msg.value < i_mintFee) {
+                    revert DaoNFT__NeedMoreETHSent();
+                }
             }
             level = Level.Soldier;
         } else if (repoContract.getRepo(msg.sender) == 1) {

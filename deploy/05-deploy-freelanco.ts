@@ -26,14 +26,6 @@ const deployBox: DeployFunction = async function (
     waitConfirmations: networkConfig[hre.network.name]?.blockConfirmations || 1,
   });
 
-  const whitelist = await deploy("Whitelist", {
-    from: deployer,
-    args: [],
-    log: true,
-    // we need to wait if on a live network so we can verify properly
-    waitConfirmations: networkConfig[hre.network.name]?.blockConfirmations || 1,
-  });
-
   const freelanco = await deploy("Freelanco", {
     from: deployer,
     args: [governor.address, gigNFT.address, reputation.address],
