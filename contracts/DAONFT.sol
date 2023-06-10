@@ -87,9 +87,6 @@ contract DaoNFT is ERC721URIStorage, VRFConsumerBaseV2, Ownable {
     }
 
     function requestNft() public payable returns (uint256 requestId) {
-        if(whitelistContract.isWhitelisted(msg.sender)){
-            // do something
-        }
         Level level;
         if (repoContract.getRepo(msg.sender) == 0) {
             if(whitelistContract.isWhitelisted(msg.sender) == false){
