@@ -1,24 +1,25 @@
-// const proposalId = args[0];
+const proposalId = args[0];
 
-// console.log("proposalId:", proposalId);
+console.log("proposalId:", proposalId);
 
-// const gptURL = "https://freelanco-backend.onrender.com/proposal/gptResponse?proposalId="
+const gptURL = "https://free-yk04.onrender.com/proposal/gptResponse";
 
-// console.log(`Sending HTTP request to ${gptURL}${proposalId}`)
+console.log(`Sending HTTP request to ${gptURL} for ${proposalId}`);
 
-// const gptRequest = Functions.makeHttpRequest({
-// url: `${gptURL}${proposalId}`,
-// method: "GET",
-// })
+const gptRequest = Functions.makeHttpRequest({
+  url: `${gptURL}`,
+  method: "POST",
+  data: {
+    proposalId: proposalId,
+  },
+});
 
-// // Execute the API request (Promise)
-// const gptResponse = await gptRequest
+// Execute the API request (Promise)
+const gptResponse = await gptRequest;
 
-// if (gptResponse.error) {
-// console.error(gptResponse.error)
-// throw Error("Request failed, try checking the params provided")
-// }
+if (gptResponse.error) {
+  console.error(gptResponse.error);
+  throw Error("Request failed, try checking the params provided");
+}
 
-// console.log(gptResponse)
-
-return Functions.encodeUint256(1);
+return Functions.encodeUint256(gptResponse.data.result);
